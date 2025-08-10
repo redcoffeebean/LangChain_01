@@ -358,7 +358,8 @@ if ask:
                     st.session_state.chat_history.append(("assistant", answer))
 
                     st.markdown("### 🧠 답변  `RAG: OFF`")
-                    st.write(answer)
+                    # st.write(answer)
+                    st.text(answer)  #  한글/영문 서식을 제거하고 '순수 텍스트'로 표시하여 글꼴 차이를 없앰
                     st.info("RAG 비활성화 상태입니다. 업로드한 문서/인덱스가 없어 일반 LLM으로 간단 답변을 제공했습니다.")
                 except Exception as e:
                     logger.exception("LLM-only 질문 처리 실패")
@@ -375,8 +376,9 @@ if ask:
                     st.session_state.chat_history.append(("assistant", answer))
 
                     st.markdown("### 🧠 답변  `RAG: ON`")
-                    st.write(answer)
-
+                    # st.write(answer)
+                    st.text(answer)  #  한글/영문 서식을 제거하고 '순수 텍스트'로 표시하여 글꼴 차이를 없앰
+                  
                     # 근거 문서 표시
                     if sources:
                         st.markdown("### 💡 참고 문서")
