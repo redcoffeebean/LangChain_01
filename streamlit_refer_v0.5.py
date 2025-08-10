@@ -69,6 +69,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
     Docx2txtLoader,
     UnstructuredPowerPointLoader,
+    TextLoader,  # ← TXT 파일 로더 추가
 )
 
 # 텍스트 스플리터(별도 패키지)
@@ -128,6 +129,9 @@ def _load_document(path: Path):
         return Docx2txtLoader(str(path))
     if ext in (".ppt", ".pptx"):
         return UnstructuredPowerPointLoader(str(path))
+    if ext == ".txt":
+        # TXT 파일 로더 (UTF-8 기준)
+        return TextLoader(str(path), encoding="utf-8")
     raise ValueError(f"😖 지원하지 않는 파일 형식: {ext}")
 
 
