@@ -38,6 +38,7 @@ from langchain.memory import ConversationBufferMemory
 # =========================
 st.set_page_config(page_title="RAG Chat (OpenAI + HF)", page_icon="🧩")
 st.title("RAG Chat with Your Files ✨")
+st.text_input("질문 입력")
 
 
 # =========================
@@ -154,7 +155,7 @@ def get_chain(vectorstore, openai_api_key: str):
 # 사이드바(UI): API 키/문서 업로드/인덱스 버튼
 # =========================
 with st.sidebar:
-    st.subheader("🔑 API & 설정")
+    st.subheader("🔑 OpenAI API Key")
 
     # 기본값: Streamlit Secrets에 OPENAI_API_KEY가 있다면 자동 사용
     default_key = st.secrets.get("OPENAI_API_KEY", "") if hasattr(st, "secrets") else ""
@@ -190,7 +191,7 @@ if "chat_history" not in st.session_state:
 # =========================
 if build_btn:
     if not openai_api_key:
-        st.error("OpenAI API Key를 입력하세요.")
+        st.error("🔑 OpenAI API Key를 입력하세요.")
     elif not uploaded_files:
         st.warning("최소 1개 이상의 문서를 업로드하세요.")
     else:
@@ -200,10 +201,10 @@ if build_btn:
                 vs = build_vectorstore(doc_paths)
                 st.session_state.vectorstore = vs
                 st.session_state.chain = get_chain(vs, openai_api_key)
-                st.success("✅ 벡터 인덱스 생성 완료!")
+                st.success("✅ Vector Index 생성 완료!")
             except Exception as e:
-                logger.exception("인덱스 생성 실패")
-                st.error(f"인덱스 생성 실패: {e}")
+                logger.exception("Vector Index 실패")
+                st.error(f"😖 인덱스 생성 실패: {e}")
 
 
 # =========================
