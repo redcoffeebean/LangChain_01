@@ -261,7 +261,7 @@ if ask:
 # =========================
 if st.session_state.chat_history:
     st.divider()
-    st.subheader("🗂️ 세션 대화 아카이브")
+    st.subheader("🗂️ 세션 아카이브")
     for role, msg in st.session_state.chat_history[-10:]:
         if role == "user":
             st.markdown(f"**You:** {msg}")
