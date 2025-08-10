@@ -177,27 +177,29 @@ def get_chain(vectorstore, openai_api_key: str):
     llm = ChatOpenAI(
         openai_api_key=openai_api_key,
         model="gpt-4o-mini",  # 저렴 & 빠름 (필요 시 gpt-4o 로 교체 가능)
-        temperature=0,
-        max_retries=3,  # 간단한 재시도 (429 등 레이트리밋 대비)
-        timeout=20,     # 너무 오래 기다리지 않도록 타임아웃
+        temperature=0,  # 0: 창의성 낮추고, 일관성 높은 답변 생성.
+        max_retries=3,  # 간단한 재시도 (429 등 레이트리밋 대비). API 호출 실패(429 등) 시 최대 3번 재시도.
+        timeout=10,     # 너무 오래 기다리지 않도록 타임아웃. 10초 이상 걸리면 요청 중단.
     )
 
     memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True,
-        output_key="answer",
+        memory_key="chat_history",  # 체인 내부에서 대화 기록을 찾을 때 쓰는 키 이름.
+        return_messages=True,       # 단순 텍스트가 아니라 대화 메시지 형식으로 저장.
+        output_key="answer",        # 최종 생성된 답변의 키 이름.
     )
 
     retriever = vectorstore.as_retriever(search_type="mmr")
-
-    chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
+                # vectorstore: 업로드된 문서 임베딩을 저장한 FAISS 벡터 DB. 
+                # retriever: 검색기 역할. 질문을 벡터로 변환 후, 문서에서 관련 청크를 찾아 반환.
+                # search_type="mmr" → MMR(Maximal Marginal Relevance) 방식. --> 유사도와 다양성을 동시에 고려해 중복 없는 결과 제공.
+    chain = ConversationalRetrievalChain.from_llm(          # from_llm: LLM, Retriever, Memory를 하나로 묶는 LangChain 헬퍼.
+        llm=llm,                          
         retriever=retriever,
-        chain_type="stuff",             # 간단하게 문서 스터핑 방식 사용(필요시 map_reduce 등 변경 가능)
+        chain_type="stuff",             # 문서 청크들을 그대로 LLM에 붙여서 질문과 함께 전달 --> 간단하게 문서 스터핑 방식 사용(필요시 map_reduce 등 변경 가능)
         memory=memory,
         get_chat_history=lambda h: h,   # 대화 내역을 그대로 전달
-        return_source_documents=True,   # 소스 문서 반환(근거 표시용)
-        verbose=True,                   # 디버깅 로그
+        return_source_documents=True,   # 답변과 함께 참고한 원문 청크를 반환. --> 소스 문서 반환(근거 표시용)
+        verbose=True,                   # 디버깅 로그 활성화
     )
     return chain
 
@@ -212,10 +214,10 @@ def answer_without_rag(question: str, openai_api_key: str) -> str:
     """
     llm = ChatOpenAI(
         openai_api_key=openai_api_key,
-        model="gpt-4o-mini",
-        temperature=0,
-        max_retries=3,
-        timeout=20,
+        model="gpt-4o-mini",  # 저렴 & 빠름 (필요 시 gpt-4o 로 교체 가능)
+        temperature=0,        # 0: 창의성 낮추고, 일관성 높은 답변 생성.
+        max_retries=3,        # 간단한 재시도 (429 등 레이트리밋 대비). API 호출 실패(429 등) 시 최대 3번 재시도.
+        timeout=10,           # 너무 오래 기다리지 않도록 타임아웃. 10초 이상 걸리면 요청 중단.
     )
     sys = SystemMessage(content="너는 간결한 조수다. 모든 답변은 2~3문장 이내로 핵심만 요약해서 말해라.")
     user = HumanMessage(content=question)
