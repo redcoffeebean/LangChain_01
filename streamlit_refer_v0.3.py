@@ -242,7 +242,7 @@ if ask:
 
                 # 근거 문서 표시
                 if sources:
-                    st.markdown("### 📎 참고 문서")
+                    st.markdown("### 💡 참고 문서")
                     with st.expander("참고 문서와 원문 일부 보기"):
                         for i, doc in enumerate(sources, 1):
                             src = doc.metadata.get("source", f"source_{i}")
@@ -261,7 +261,7 @@ if ask:
 # =========================
 if st.session_state.chat_history:
     st.divider()
-    st.subheader("🗂️ 현재 세션 대화 기록")
+    st.subheader("🗂️ 세션 대화 아카이브")
     for role, msg in st.session_state.chat_history[-10:]:
         if role == "user":
             st.markdown(f"**You:** {msg}")
