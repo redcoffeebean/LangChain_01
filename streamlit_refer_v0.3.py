@@ -36,9 +36,10 @@ from langchain.memory import ConversationBufferMemory
 # =========================
 # Streamlit 기본 설정
 # =========================
-st.set_page_config(page_title="RAG Chat (OpenAI + HF)", page_icon="🧩")
-st.title("RAG (Retrieval Augmented Generation) Chatbot 🤖")
-st.text_input("검색 증강 생성 시스템")
+st.set_page_config(page_title="RAG Chatbot (OpenAI + HF)", page_icon="🤖")
+st.title("RAG Chatbot 🤖")
+st.text("검색 증강 생성 시스템")
+st.text("RAG (Retrieval-Augmented Generation)는 LLM이 지니는 통제하기 어려운 한계, 즉 ‘사실 관계 오류 가능성’ (Hallucination)과 ‘맥락 이해의 한계’를 개선하고 보완하는 데 초점을 둔 방법입니다. RAG는 LLM에 외부 지식베이스를 연결하여, 답변 생성 능력은 물론 특정 산업 도메인에 특화된 정보와 최신 데이터를 기반으로 한 사실 관계 파악 능력까지 향상시키는 기술입니다.")
 
 
 # =========================
