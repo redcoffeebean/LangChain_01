@@ -221,9 +221,9 @@ ask = st.button("질문하기")
 # =========================
 if ask:
     if not openai_api_key:
-        st.error("OpenAI API Key를 입력하세요.")
+        st.error("🔑 OpenAI API Key를 입력하세요.")
     elif st.session_state.chain is None:
-        st.warning("먼저 문서를 업로드하고 인덱스를 생성하세요.")
+        st.warning("📑 먼저 문서를 업로드하고 인덱스를 생성하세요.")
     elif not user_q.strip():
         st.info("질문을 입력하세요.")
     else:
