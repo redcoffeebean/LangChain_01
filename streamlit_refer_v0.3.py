@@ -253,7 +253,7 @@ if ask:
                             st.code(preview)
             except Exception as e:
                 logger.exception("질문 처리 실패")
-                st.error(f"질문 처리 실패: {e}")
+                st.error(f"😖 질문 처리 실패: {e}")
 
 
 # =========================
