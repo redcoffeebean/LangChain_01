@@ -1,156 +1,201 @@
+import os
+import io
+import tempfile
+from pathlib import Path
+from typing import List
+
 import streamlit as st
-import tiktoken
 from loguru import logger
 
+# 변경: LangChain 패키지 분리로 인한 import 경로 수정
+from langchain_openai import ChatOpenAI  # 기존: from langchain.chat_models import ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings  # 기존: from langchain.embeddings import ...
+from langchain_community.vectorstores import FAISS  # 기존: from langchain.vectorstores import FAISS
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    Docx2txtLoader,
+    UnstructuredPowerPointLoader,
+)
+
+# 변경: text splitters가 별도 패키지로 이동됨
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from langchain.chains import ConversationalRetrievalChain
-from langchain.chat_models import ChatOpenAI
-
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import Docx2txtLoader
-from langchain.document_loaders import UnstructuredPowerPointLoader
-
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
-
 from langchain.memory import ConversationBufferMemory
-from langchain.vectorstores import FAISS
 
-# from streamlit_chat import message
-from langchain.callbacks import get_openai_callback
-from langchain.memory import StreamlitChatMessageHistory
+# -----------------------------
+# 업로드 파일 저장 함수
+# -----------------------------
+def _persist_upload(file) -> Path:
+    """업로드된 파일을 임시 폴더에 저장 후 경로 반환"""
+    suffix = Path(file.name).suffix
+    tmp_dir = Path(tempfile.mkdtemp(prefix="st_docs_"))
+    out_path = tmp_dir / file.name
+    out_path.write_bytes(file.getbuffer())
+    logger.info(f"업로드 파일 저장 경로: {out_path}")
+    return out_path
 
-def main():
-    st.set_page_config(
-    page_title="DirChat",
-    page_icon=":books:")
+# -----------------------------
+# 문서 로드 함수
+# -----------------------------
+def _load_document(path: Path):
+    ext = path.suffix.lower()
+    if ext == ".pdf":
+        return PyPDFLoader(str(path))
+    if ext == ".docx":
+        return Docx2txtLoader(str(path))
+    if ext in (".ppt", ".pptx"):
+        return UnstructuredPowerPointLoader(str(path))
+    raise ValueError(f"지원하지 않는 파일 형식: {ext}")
 
-    st.title("_Private Data :red[QA Chat]_ :books:")
+# -----------------------------
+# 벡터스토어 생성
+# -----------------------------
+def build_vectorstore(doc_paths: List[Path]):
+    """HF 임베딩을 이용하여 FAISS 인덱스 생성"""
+    docs = []
+    for p in doc_paths:
+        loader = _load_document(p)
+        docs.extend(loader.load())
 
-    if "conversation" not in st.session_state:
-        st.session_state.conversation = None
+    splitter = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=120)
+    splits = splitter.split_documents(docs)
 
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = None
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vectorstore = FAISS.from_documents(splits, embeddings)
+    return vectorstore
 
-    if "processComplete" not in st.session_state:
-        st.session_state.processComplete = None
-
-    with st.sidebar:
-        uploaded_files =  st.file_uploader("Upload your file",type=['pdf','docx'],accept_multiple_files=True)
-        openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-        process = st.button("Process")
-    if process:
-        if not openai_api_key:
-            st.info("Please add your OpenAI API key to continue.")
-            st.stop()
-        files_text = get_text(uploaded_files)
-        text_chunks = get_text_chunks(files_text)
-        vetorestore = get_vectorstore(text_chunks)
-     
-        st.session_state.conversation = get_conversation_chain(vetorestore,openai_api_key) 
-
-        st.session_state.processComplete = True
-
-    if 'messages' not in st.session_state:
-        st.session_state['messages'] = [{"role": "assistant", 
-                                        "content": "안녕하세요! 주어진 문서에 대해 궁금하신 것이 있으면 언제든 물어봐주세요!"}]
-
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    history = StreamlitChatMessageHistory(key="chat_messages")
-
-    # Chat logic
-    if query := st.chat_input("질문을 입력해주세요."):
-        st.session_state.messages.append({"role": "user", "content": query})
-
-        with st.chat_message("user"):
-            st.markdown(query)
-
-        with st.chat_message("assistant"):
-            chain = st.session_state.conversation
-
-            with st.spinner("Thinking..."):
-                result = chain({"question": query})
-                with get_openai_callback() as cb:
-                    st.session_state.chat_history = result['chat_history']
-                response = result['answer']
-                source_documents = result['source_documents']
-
-                st.markdown(response)
-                with st.expander("참고 문서 확인"):
-                    st.markdown(source_documents[0].metadata['source'], help = source_documents[0].page_content)
-                    st.markdown(source_documents[1].metadata['source'], help = source_documents[1].page_content)
-                    st.markdown(source_documents[2].metadata['source'], help = source_documents[2].page_content)
-                    
-
-
-# Add assistant message to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-def tiktoken_len(text):
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokens = tokenizer.encode(text)
-    return len(tokens)
-
-def get_text(docs):
-
-    doc_list = []
-    
-    for doc in docs:
-        file_name = doc.name  # doc 객체의 이름을 파일 이름으로 사용
-        with open(file_name, "wb") as file:  # 파일을 doc.name으로 저장
-            file.write(doc.getvalue())
-            logger.info(f"Uploaded {file_name}")
-        if '.pdf' in doc.name:
-            loader = PyPDFLoader(file_name)
-            documents = loader.load_and_split()
-        elif '.docx' in doc.name:
-            loader = Docx2txtLoader(file_name)
-            documents = loader.load_and_split()
-        elif '.pptx' in doc.name:
-            loader = UnstructuredPowerPointLoader(file_name)
-            documents = loader.load_and_split()
-
-        doc_list.extend(documents)
-    return doc_list
-
-
-def get_text_chunks(text):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=900,
-        chunk_overlap=100,
-        length_function=tiktoken_len
+# -----------------------------
+# 체인 구성
+# -----------------------------
+def get_chain(vectorstore, openai_api_key: str):
+    # 변경: ChatOpenAI 임포트 경로 및 모델명 최신화
+    llm = ChatOpenAI(
+        openai_api_key=openai_api_key,
+        model="gpt-4o-mini",
+        temperature=0,
     )
-    chunks = text_splitter.split_documents(text)
-    return chunks
 
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        return_messages=True,
+        output_key="answer",
+    )
 
-def get_vectorstore(text_chunks):
-    embeddings = HuggingFaceEmbeddings(
-                                        model_name="jhgan/ko-sroberta-multitask",
-                                        model_kwargs={'device': 'cpu'},
-                                        encode_kwargs={'normalize_embeddings': True}
-                                        )  
-    vectordb = FAISS.from_documents(text_chunks, embeddings)
-    return vectordb
+    # 변경: as_retriever() 불필요/오타 파라미터 제거
+    retriever = vectorstore.as_retriever(search_type="mmr")
 
-def get_conversation_chain(vetorestore,openai_api_key):
-    llm = ChatOpenAI(openai_api_key=openai_api_key, model_name = 'gpt-3.5-turbo',temperature=0)
-    conversation_chain = ConversationalRetrievalChain.from_llm(
-            llm=llm, 
-            chain_type="stuff", 
-            retriever=vetorestore.as_retriever(search_type = 'mmr', vervose = True), 
-            memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
-            get_chat_history=lambda h: h,
-            return_source_documents=True,
-            verbose = True
-        )
+    chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=retriever,
+        chain_type="stuff",
+        memory=memory,
+        get_chat_history=lambda h: h,
+        return_source_documents=True,
+        verbose=True,
+    )
+    return chain
 
-    return conversation_chain
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+st.set_page_config(page_title="RAG Chat (Patched)", page_icon="🧩")
 
+st.title("RAG Chat with Your Files ✨")
 
+with st.sidebar:
+    st.subheader("🔑 API & 설정")
 
-if __name__ == '__main__':
-    main()
+    # 기본값: secrets에서 불러오기
+    default_key = st.secrets.get("OPENAI_API_KEY", "") if hasattr(st, "secrets") else ""
+    openai_api_key = st.text_input(
+        "OpenAI API Key",
+        type="password",
+        value=default_key,
+        help="Secrets에 OPENAI_API_KEY를 저장할 수도 있습니다"
+    )
+
+    uploaded_files = st.file_uploader(
+        "문서 업로드 (PDF/DOCX/PPTX)",
+        type=["pdf", "docx", "pptx"],  # 변경: pptx 지원 추가
+        accept_multiple_files=True,
+    )
+
+    build_btn = st.button("인덱스 생성/재생성")
+
+# 세션 상태 초기화
+if "vectorstore" not in st.session_state:
+    st.session_state.vectorstore = None
+if "chain" not in st.session_state:
+    st.session_state.chain = None
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# 인덱스 빌드
+if build_btn:
+    if not openai_api_key:
+        st.error("OpenAI API Key를 입력하세요.")
+    elif not uploaded_files:
+        st.warning("최소 1개 이상의 문서를 업로드하세요.")
+    else:
+        with st.spinner("문서 인덱싱 중…"):
+            try:
+                doc_paths = [_persist_upload(f) for f in uploaded_files]
+                vs = build_vectorstore(doc_paths)
+                st.session_state.vectorstore = vs
+                st.session_state.chain = get_chain(vs, openai_api_key)
+                st.success("벡터 인덱스 생성 완료!")
+            except Exception as e:
+                logger.exception("인덱스 생성 실패")
+                st.error(f"인덱스 생성 실패: {e}")
+
+# 채팅 입력
+st.divider()
+st.subheader("💬 문서 기반 질문하기")
+user_q = st.text_input("질문 입력", placeholder="예: 문서 핵심 요약 알려줘")
+ask = st.button("질문하기")
+
+# QA 실행
+if ask:
+    if not openai_api_key:
+        st.error("OpenAI API Key를 입력하세요.")
+    elif st.session_state.chain is None:
+        st.warning("먼저 문서를 업로드하고 인덱스를 생성하세요.")
+    elif not user_q.strip():
+        st.info("질문을 입력하세요.")
+    else:
+        with st.spinner("응답 생성 중…"):
+            try:
+                result = st.session_state.chain({"question": user_q})
+                answer = result.get("answer", "(답변 없음)")
+                sources = result.get("source_documents", [])
+
+                st.session_state.chat_history.append(("user", user_q))
+                st.session_state.chat_history.append(("assistant", answer))
+
+                st.markdown("### 🧠 답변")
+                st.write(answer)
+
+                if sources:
+                    st.markdown("### 📎 참고 문서")
+                    with st.expander("참고 문서와 원문 일부 보기"):
+                        for i, doc in enumerate(sources, 1):
+                            src = doc.metadata.get("source", f"source_{i}")
+                            st.markdown(f"**{i}.** {src}")
+                            preview = (doc.page_content or "").strip()
+                            if len(preview) > 600:
+                                preview = preview[:600] + " …"
+                            st.code(preview)
+            except Exception as e:
+                logger.exception("질문 처리 실패")
+                st.error(f"질문 처리 실패: {e}")
+
+# 대화 히스토리 표시
+if st.session_state.chat_history:
+    st.divider()
+    st.subheader("🗂️ 현재 세션 대화 기록")
+    for role, msg in st.session_state.chat_history[-10:]:
+        if role == "user":
+            st.markdown(f"**You:** {msg}")
+        else:
+            st.markdown(f"**Assistant:** {msg}")
