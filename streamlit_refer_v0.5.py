@@ -294,8 +294,8 @@ with st.sidebar:
     )
 
     uploaded_files = st.file_uploader(
-        "문서 업로드 (PDF/DOCX/PPTX)",
-        type=["pdf", "docx", "pptx"],
+        "문서 업로드 (PDF/DOCX/PPTX/TXT)",   # 안내 문구에 TXT 추가
+        type=["pdf", "docx", "pptx", "txt"],  #  txt 확장자 허용
         accept_multiple_files=True,
     )
 
