@@ -81,7 +81,7 @@ from langchain.schema import SystemMessage, HumanMessage
 # =========================
 st.set_page_config(page_title="RAG Chatbot (OpenAI + HF)", page_icon="🤖")
 st.title("RAG Chatbot ✨")
-st.caption("문서 인덱스를 생성하면 RAG로 답변하고, 인덱스가 없으면 간단한 LLM-only 답변을 제공합니다.")
+st.caption("문서가 업로드된 경우는 RAG로 답변하고, 업로드되지 않은 경우는 LLM에서 답변을 제공합니다.")
 
 
 # =========================
@@ -107,7 +107,7 @@ def _load_document(path: Path):
         return Docx2txtLoader(str(path))
     if ext in (".ppt", ".pptx"):
         return UnstructuredPowerPointLoader(str(path))
-    raise ValueError(f"지원하지 않는 파일 형식: {ext}")
+    raise ValueError(f"😖 지원하지 않는 파일 형식: {ext}")
 
 
 # =========================
@@ -147,7 +147,7 @@ def build_vectorstore(doc_paths: List[Path]):
     """
     if FAISS is None:
         raise RuntimeError(
-            f"FAISS 모듈을 불러오지 못했습니다. (원인: {repr(_faiss_import_err)})\n"
+            f"😖 FAISS 모듈을 불러오지 못했습니다. (원인: {repr(_faiss_import_err)})\n"
             "CPU 환경에서는 requirements.txt에 'faiss-cpu'를 추가해 주세요.\n"
             "GPU(CUDA) 환경에서는 'faiss-gpu'를 사용합니다."
         )
@@ -179,7 +179,7 @@ def get_chain(vectorstore, openai_api_key: str):
         model="gpt-4o-mini",  # 저렴 & 빠름 (필요 시 gpt-4o 로 교체 가능)
         temperature=0,
         max_retries=3,  # 간단한 재시도 (429 등 레이트리밋 대비)
-        timeout=30,     # 너무 오래 기다리지 않도록 타임아웃
+        timeout=20,     # 너무 오래 기다리지 않도록 타임아웃
     )
 
     memory = ConversationBufferMemory(
@@ -215,7 +215,7 @@ def answer_without_rag(question: str, openai_api_key: str) -> str:
         model="gpt-4o-mini",
         temperature=0,
         max_retries=3,
-        timeout=30,
+        timeout=20,
     )
     sys = SystemMessage(content="너는 간결한 조수다. 모든 답변은 2~3문장 이내로 핵심만 요약해서 말해라.")
     user = HumanMessage(content=question)
@@ -235,7 +235,7 @@ with st.sidebar:
         "OpenAI API Key",
         type="password",
         value=default_key,
-        help="Streamlit Cloud의 Secrets에 OPENAI_API_KEY를 등록해 두면 자동으로 불러옵니다.",
+        help="Streamlit Cloud의 Secrets에 OPENAI_API_KEY를 등록하면 자동으로 사용됩니다.",
     )
 
     uploaded_files = st.file_uploader(
@@ -267,7 +267,7 @@ if build_btn:
     elif not uploaded_files:
         st.warning("최소 1개 이상의 문서를 업로드하세요.")
     else:
-        with st.spinner("문서 인덱싱 중… (최초 1회는 모델 로드로 시간이 걸릴 수 있습니다)"):
+        with st.spinner("문서 벡터 인덱싱 중… (최초에는 모델 로딩 시간이 걸릴 수 있습니다)"):
             try:
                 doc_paths = [_persist_upload(f) for f in uploaded_files]
                 vs = build_vectorstore(doc_paths)
@@ -300,7 +300,7 @@ if ask:
         # 1) 인덱스/체인 준비 여부 확인
         if st.session_state.chain is None:
             # 🔁 폴백: 문서 인덱스가 없으므로 LLM 단독 간단 답변
-            with st.spinner("LLM 간단 답변 생성 중… (RAG 없음)"):
+            with st.spinner("LLM 답변 생성 중… (RAG OFF)"):
                 try:
                     answer = answer_without_rag(user_q, openai_api_key)
                     st.session_state.chat_history.append(("user", user_q))
@@ -314,7 +314,7 @@ if ask:
                     st.error(f"😖 질문 처리 실패(LLM-only): {e}")
         else:
             # ✅ RAG 경로
-            with st.spinner("응답 생성 중… (RAG ON)"):
+            with st.spinner("RAG 응답 생성 중… (RAG ON)"):
                 try:
                     result = st.session_state.chain({"question": user_q})
                     answer = result.get("answer", "(답변 없음)")
@@ -329,7 +329,7 @@ if ask:
                     # 근거 문서 표시
                     if sources:
                         st.markdown("### 💡 참고 문서")
-                        with st.expander("참고 문서와 원문 일부 보기"):
+                        with st.expander("참고 문서 위치 및 원문 일부 보기"):
                             for i, doc in enumerate(sources, 1):
                                 src = doc.metadata.get("source", f"source_{i}")
                                 st.markdown(f"**{i}.** {src}")
