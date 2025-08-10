@@ -318,7 +318,7 @@ if build_btn:
     elif not uploaded_files:
         st.warning("최소 1개 이상의 문서를 업로드하세요.")
     else:
-        with st.spinner("문서 벡터 인덱싱 중… (최초에는 모델/토크나이저 로딩 시간이 걸릴 수 있습니다)"):
+        with st.spinner("벡터 인덱싱 중… (최초에는 모델/토크나이저 로딩 시간이 걸릴 수 있습니다)"):
             try:
                 doc_paths = [_persist_upload(f) for f in uploaded_files]
                 vs = build_vectorstore(doc_paths)
