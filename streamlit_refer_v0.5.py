@@ -102,7 +102,7 @@ TOKEN_CHUNK_OVERLAP = 80             # 청크 간 겹침(토큰 단위)
 # =========================
 st.set_page_config(page_title="RAG Chatbot", page_icon="🤖")
 st.title("RAG Chatbot ✨")
-st.caption("문서를 인덱싱하면 문서 기반으로 답변(RAG), 인덱스가 없으면 간단한 일반 답변(LLM-only)을 제공합니다.")
+st.caption("문서가 업로드된 경우는 RAG로 답변하고, 업로드되지 않은 경우는 LLM에서 답변을 제공합니다.")
 
 
 # =========================
