@@ -100,7 +100,7 @@ TOKEN_CHUNK_OVERLAP = 80             # 청크 간 겹침(토큰 단위)
 # =========================
 # Streamlit 기본 설정
 # =========================
-st.set_page_config(page_title="RAG Chatbot (OpenAI + HF, Token Chunking)", page_icon="🤖")
+st.set_page_config(page_title="RAG Chatbot", page_icon="🤖")
 st.title("RAG Chatbot ✨")
 st.caption("문서를 인덱싱하면 문서 기반으로 답변(RAG), 인덱스가 없으면 간단한 일반 답변(LLM-only)을 제공합니다.")
 
