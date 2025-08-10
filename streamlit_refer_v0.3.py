@@ -37,8 +37,8 @@ from langchain.memory import ConversationBufferMemory
 # Streamlit 기본 설정
 # =========================
 st.set_page_config(page_title="RAG Chat (OpenAI + HF)", page_icon="🧩")
-st.title("RAG Chat with Your Files ✨")
-st.text_input("질문 입력")
+st.title("RAG (Retrieval Augmented Generation) Chatbot 🤖")
+st.text_input("검색 증강 생성 시스템")
 
 
 # =========================
