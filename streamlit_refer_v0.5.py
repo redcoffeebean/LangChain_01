@@ -4,7 +4,7 @@ streamlit_refer.py — RAG(Chat + Retrieval) 앱 (OpenAI LLM + HuggingFace 임�
 [구성 요약]
 - LLM: OpenAI Chat (gpt-4o-mini; 저렴/빠름)
 - Embeddings: HuggingFace (paraphrase-MiniLM-L6-v2)
-- 문서 로더: PDF, DOCX, PPTX
+- 문서 로더: PDF, DOCX, PPTX, TXT
 - 벡터스토어: FAISS
 - 체인: ConversationalRetrievalChain (대화형 RAG)
 - 폴백: 인덱스가 없으면 LLM-only로 간단 답변 + "RAG: OFF" 안내
