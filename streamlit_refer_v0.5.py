@@ -160,7 +160,7 @@ def _get_tiktoken_encoding(name: str):
     """
     if tiktoken is None:
         raise RuntimeError(
-            f"tiktoken을 불러오지 못했습니다. (원인: {repr(_tiktoken_import_err)})\n"
+            f"😖 tiktoken을 불러오지 못했습니다. (원인: {repr(_tiktoken_import_err)})\n"
             "requirements.txt에 'tiktoken'을 추가하고 재배포하세요."
         )
     try:
@@ -294,7 +294,7 @@ with st.sidebar:
     )
 
     uploaded_files = st.file_uploader(
-        "문서 업로드 (PDF/DOCX/PPTX/TXT)",   # 안내 문구에 TXT 추가
+        "문서 업로드. 1MB 미만 권장. (PDF/DOCX/PPTX/TXT)",   # 안내 문구에 TXT 추가
         type=["pdf", "docx", "pptx", "txt"],  #  txt 확장자 허용
         accept_multiple_files=True,
     )
@@ -320,26 +320,8 @@ if build_btn:
     if not openai_api_key:
         st.error("🔑 OpenAI API Key를 입력하세요.")
     elif not uploaded_files:
-        st.warning("최소 1개 이상의 문서를 업로드하세요.")
-    else:
-        with st.spinner("벡터 인덱싱 중… (최초에는 모델/토크나이저 로딩 시간이 걸릴 수 있습니다)"):
-            try:
-                doc_paths = [_persist_upload(f) for f in uploaded_files]
-                vs = build_vectorstore(doc_paths)
-                st.session_state.vectorstore = vs
-                st.session_state.chain = get_chain(vs, openai_api_key)
-                st.success("✅ Vector Index 생성 완료! (RAG 가능)")
-            except Exception as e:
-                logger.exception("Vector Index 실패")
-                st.error(f"😖 인덱스 생성 실패: {e}")
-
-
-# =========================
-# 질의 UI
-# =========================
-st.divider()
-st.subheader("💬 문서 기반 자연어 질문")
-user_q = st.text_input("질문 입력:", placeholder="예: 업로드한 문서의 핵심만 간단히 알려주세요")
+        st.warning("최소 의")
+user_q = st.text_input("질문 입력:", placeholder="예: 업로드한 문서에 대해 질문해 보세요.")
 ask = st.button("질문하기")
 
 
@@ -395,7 +377,7 @@ if ask:
                                     preview = preview[:600] + " …"
                                 st.code(preview)
                     else:
-                        st.info("해당 질문과 직접적으로 매칭되는 문서 청크를 찾지 못했습니다. (질문을 더 구체화하거나 인덱싱 범위를 늘려 보세요.)")
+                        st.info("해당 질문과 직접적으로 매칭되는 문서 청크를 찾지 못했습니다. (질문을 좀 더 구체화하세요.)")
                 except Exception as e:
                     logger.exception("질문 처리 실패(RAG)")
                     st.error(f"😖 질문 처리 실패(RAG): {e}")
