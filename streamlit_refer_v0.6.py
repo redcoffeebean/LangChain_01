@@ -370,7 +370,7 @@ if build_btn:                                       # build_btn(Streamlit 버튼
 # 질의 UI
 # =========================
 st.divider()                            # Streamlit UI 페이지에 가로 구분선(visual divider) 표시
-st.subheader("💬 RAG 기반 자연어 질의")       # Streamlit UI 페이지에 소제목(subheader)을 표시
+st.subheader("💬 문서 기반 자연어 질의")       # Streamlit UI 페이지에 소제목(subheader)을 표시
 user_q = st.text_input("질문 입력:", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")  # Streamlit UI 페이지에 텍스트 입력 상자 표시
 ask = st.button("질문하기")                # Streamlit UI 페이지에 버튼을 화면에 생성하고, 클릭 여부를 불리언으로 반환 >> 라벨 "질문하기" 글자가 버튼에 표시
 
