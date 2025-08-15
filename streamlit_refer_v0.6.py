@@ -374,7 +374,7 @@ if delete_btn:
     if st.session_state.get("vectorstore") is None and st.session_state.get("chain") is None:
         st.info("⛔ 삭제할 Vector Index가 없습니다.")
     else:
-        with st.spinner("🏃🏻 Vector Index 삭제 중… "):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
+            with st.spinner("🏃🏻 Vector Index 삭제 중… "):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
             try:
                 # 1) 참조 제거 (세션 상태에서 삭제)
                 vs = st.session_state.get("vectorstore")
