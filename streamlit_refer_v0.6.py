@@ -360,7 +360,7 @@ if build_btn:                                       # build_btn(Streamlit 버튼
                 st.session_state.vectorstore = vs                               # 생성된 벡터스토어 객체인 vs를 Streamlit 세션 상태(st.session_state)의 vectorstore 키에 저장
                 st.session_state.chain = get_chain(vs, openai_api_key)          # get_chain(...)을 호출해 vs(벡터스토어)와 openai_api_key를 사용해 RAG 체인(ConversationalRetrievalChain 등)을 생성하고, 그 체인 객체를 세션상태의 chain 키에 저장
                                                                                 # 이후 채팅 요청 시 이 chain을 바로 꺼내 쓸 수 있음                
-                st.success("🙆 Vector Index 생성 완료! (RAG: ON)")                 # 성공적으로 인덱스와 체인을 생성되었음을 Streamlit UI에 성공 메시지 출력
+                st.success("✅ Vector Index 생성 완료! (RAG: ON)")                 # 성공적으로 인덱스와 체인을 생성되었음을 Streamlit UI에 성공 메시지 출력
             except Exception as e:                                              # try 블록에서 어떤 예외가 발생하면 이 except 블록이 실행되며 >> 예외 객체를 e에 바인딩
                 logger.exception("Vector Index 생성 실패")                         # logger.exception(...)는 예외 발생 시 메세지를 포함해 로그를 생성
                 st.error(f"😖 Vector Index 생성 실패: {e}")                        # 사용자에게 에러 메시지 출력
@@ -399,7 +399,7 @@ if delete_btn:
                 import gc
                 gc.collect()
 
-                st.success("🙅 Vector Index 및 RAG Chain 삭제 완료! (RAG: OFF)")
+                st.success("❎ Vector Index 및 RAG Chain 삭제 완료! (RAG: OFF)")
             except Exception as e:
                 logger.exception("Vector Index 삭제 실패")
                 st.error(f"😖 Vector Index 삭제 실패: {e}")
