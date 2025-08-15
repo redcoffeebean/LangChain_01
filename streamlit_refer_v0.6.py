@@ -398,7 +398,7 @@ if ask:                                                             # 이전에 
                     st.markdown("### 👽 답변  `RAG: OFF`")                                # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
                     # st.write(answer)                                                  # st.write(answer)는 마크다운/리치 텍스트를 렌더링할 수 있고, 포맷 유지가고 글꼴/스타일 차이 발생 가능
                     st.text(answer)                                                     # st.text(answer)는 한글/영문 서식을 제거하고 순수 텍스트(포맷 없이)로 표시
-                    st.info("RAG 비활성화 상태입니다. 업로드한 문서가 없어 LLM 만으로 간단히 답변을 제공합니다.")
+                    st.info("RAG 비활성화 상태입니다. Vector Index가 없기에 LLM으로 일반적인 답변을 제공합니다.")
 
                 except Exception as e:                            # 예외처리: try 블록 내부에서 어떤 오류가 발생하면 여기로 분기되어 예외객체를 e에 바인딩
                     logger.exception("LLM-Only 질문 처리 실패")        # 로거에 예외와 스택 트레이스를 함께 기록
