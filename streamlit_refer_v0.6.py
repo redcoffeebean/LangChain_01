@@ -360,7 +360,7 @@ if build_btn:                                       # build_btn(Streamlit 버튼
                 st.session_state.vectorstore = vs                               # 생성된 벡터스토어 객체인 vs를 Streamlit 세션 상태(st.session_state)의 vectorstore 키에 저장
                 st.session_state.chain = get_chain(vs, openai_api_key)          # get_chain(...)을 호출해 vs(벡터스토어)와 openai_api_key를 사용해 RAG 체인(ConversationalRetrievalChain 등)을 생성하고, 그 체인 객체를 세션상태의 chain 키에 저장
                                                                                 # 이후 채팅 요청 시 이 chain을 바로 꺼내 쓸 수 있음                
-                st.success("✅ Vector Index 생성 완료! (RAG 가능)")                  # 성공적으로 인덱스와 체인을 생성되었음을 Streamlit UI에 성공 메시지 출력
+                st.success("✅ Vector Index 생성 완료! (RAG: ON)")                  # 성공적으로 인덱스와 체인을 생성되었음을 Streamlit UI에 성공 메시지 출력
             except Exception as e:                                              # try 블록에서 어떤 예외가 발생하면 이 except 블록이 실행되며 >> 예외 객체를 e에 바인딩
                 logger.exception("Vector Index 실패")                             # logger.exception(...)는 예외 발생 시 메세지를 포함해 로그를 생성
                 st.error(f"😖 인덱스 생성 실패: {e}")                                 # 사용자에게 에러 메시지 출력
@@ -405,7 +405,7 @@ if ask:                                                             # 이전에 
                     st.error(f"😖 질문 처리 실패(LLM-Only): {e}")      # 실패 사실과 예외 메시지(간단히 e의 문자열) 출력
         else:                                                     # 위의 if st.session_state.chain is None: 블록의 else 분기 >> 즉 체인(문서인덱스+RAG)이 준비되어 있을 때 실행되는 분기 >> RAG(문서기반 응답)경로
             # ✅ RAG-ON 경로
-            with st.spinner("RAG 응답 생성 중… (RAG: ON)"):                             # Streamlit 스피너 메시지와 로딩 표시
+            with st.spinner("RAG 답변 생성 중… (RAG: ON)"):                             # Streamlit 스피너 메시지와 로딩 표시
                 try:                                                                # 내부에서 일어날 수 있는 오류(예:검색실패, LLM호출실패)를 잡기 위해 try 블록을 사용
                     result = st.session_state.chain({"question": user_q})           # 세션상태에 저장된 chain(ConversationalRetrievalChain 등)을 호출(실행)하여 >> user_q 질문 처리
                                                                                     # 반환값 result는 일반적으로 딕셔너리 형태로, answer(LLM생성답변)와 source_documents(retriever가 가져온 근거문서 리스트)을 포함
@@ -415,7 +415,7 @@ if ask:                                                             # 이전에 
                     st.session_state.chat_history.append(("user", user_q))          # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("user", user_q) 표현 
                     st.session_state.chat_history.append(("assistant", answer))     # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("assistant", answer) 표현
 
-                    st.markdown("### 🤖 답변  `RAG: ON`")                                 # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
+                    st.markdown("### 🧠 답변  `RAG: ON`")                                 # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
                     # st.write(answer)                                                  # st.write(answer)는 마크다운/리치 텍스트를 렌더링할 수 있고, 포맷 유지가고 글꼴/스타일 차이 발생 가능
                     st.text(answer)                                                     # st.text(answer)는 한글/영문 서식을 제거하고 순수 텍스트(포맷 없이)로 표시
                   
