@@ -374,7 +374,7 @@ if delete_btn:
     if st.session_state.get("vectorstore") is None and st.session_state.get("chain") is None:
         st.info("⛔ 삭제할 Vector Index가 없습니다.")
     else:
-            with st.spinner("🏃🏻 Vector Index 삭제 중… "):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
+        with st.spinner("🏃🏻 Vector Index 삭제 중… "):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
             try:
                 # 1) 참조 제거 (세션 상태에서 삭제)
                 vs = st.session_state.get("vectorstore")
@@ -486,4 +486,7 @@ if st.session_state.chat_history:           # st.session_state에 저장된 chat
             st.markdown(f"**You:** {msg}")                  # **You:**는 굵게(강조) 표시되고, 뒤의 {msg}는 실제 메시지 출력 >> 마크다운 형식으로 출력  
                                                             # msg에 Markdown 문법이 포함되어 있으면 그대로 렌더링됨 (원치않으면 st.text(msg) 또는 st.write(escape) 방식 사용 가능)
         else:                                               # role이 "user"가 아니면 (보통 어시스턴트) 아래 블록을 실행
-            st.markdown(f"**Assistant:** {msg}")            # **Assistant:**는 굵게(강조) 표시되고, 뒤의 {msg}는 실제 메시지 출력 >> 마크다운 형식으로 출력
+            st.markdown(f"**Assistant:** {msg}")            # **Assistant:**는 굵게(강조) 표시되고, 뒤의 {msg}는 실제 메시지 출력 >> 마크다운 형식으로 출력 
+            
+
+
