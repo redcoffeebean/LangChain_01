@@ -376,7 +376,7 @@ ask = st.button("질문하기")                # Streamlit UI 페이지에 버�
 
 
 # ==============================================
-# QA 실행: RAG-ON 경우 vs. RAG-OFF 경우 >> 폴백 로직 포함
+# QA 실행: RAG-ON 경우 vs. RAG-OFF 경우 >> 폴백 로직 포함 🧠
 # ==============================================
 # 폴백(fallback) == (의존성 없을 때/예외 발생할 때의) 대체행동
 
@@ -388,14 +388,14 @@ if ask:                                                             # 이전에 
     else:                                                           # 위의 두 입력 검사를 모두 통과한 경우(키있고,질문입력됨) 실제 질의 처리 로직을 실행
         # 1) 인덱스/체인 준비 여부 확인
         if st.session_state.chain is None:                          # 세션상태에 저장된 chain이 None인지 확인 >> None이면 문서기반 체인(ConversationalRetrievalChain 등)이 아직 준비되지 않은 상태                              
-            # 🔁 폴백:  RAG-OFF 경로                                   # 문서 인덱스가 없으므로 LLM 단독 간단 답변 >> 인덱스/체인이 없을 때의 정책 설명 >> RAG 대신 LLM 단독 모드로 간단히 답변을 제공하는 폴백(fallback) 동작 수행
+            # 🔁 폴백(fallback): RAG-OFF 경로                                   # 문서 인덱스가 없으므로 LLM 단독 간단 답변 >> 인덱스/체인이 없을 때의 정책 설명 >> RAG 대신 LLM 단독 모드로 간단히 답변을 제공하는 폴백(fallback) 동작 수행
             with st.spinner("LLM 답변 생성 중… (RAG: OFF)"):                            # Streamlit의 스피너(로딩 표시)를 보여주는 컨텍스트 블록
                 try:                                                                # try 블록 시작: 내부에서 발생할 수 있는 예외(에러)를 잡아서 사용자에게 친절히 알리기 위해 예외 처리 블록인 try를 사용했음
                     answer = answer_without_rag(user_q, openai_api_key)             # RAG 없이 LLM만으로 답을 생성하는 함수 answer_without_rag를 호출해서 >> user_q(질문)과 openai_api_key를 반환 >> 반환된 문자열(모델응답)을 answer에 저장
                     st.session_state.chat_history.append(("user", user_q))          # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("user", user_q) 표현
                     st.session_state.chat_history.append(("assistant", answer))     # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("assistant", answer) 표현
 
-                    st.markdown("### 🧠 답변  `RAG: OFF`")                                # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
+                    st.markdown("### 👽 답변  `RAG: OFF`")                                # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
                     # st.write(answer)                                                  # st.write(answer)는 마크다운/리치 텍스트를 렌더링할 수 있고, 포맷 유지가고 글꼴/스타일 차이 발생 가능
                     st.text(answer)                                                     # st.text(answer)는 한글/영문 서식을 제거하고 순수 텍스트(포맷 없이)로 표시
                     st.info("RAG 비활성화 상태입니다. 업로드한 문서가 없어 LLM 만으로 간단히 답변을 제공합니다.")
@@ -415,7 +415,7 @@ if ask:                                                             # 이전에 
                     st.session_state.chat_history.append(("user", user_q))          # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("user", user_q) 표현 
                     st.session_state.chat_history.append(("assistant", answer))     # 세션상태에 저장된 chat_history 리스트에 사용자의 질문 항목을 추가 >> (role, message) 형식의 튜플로써 여기서는 ("assistant", answer) 표현
 
-                    st.markdown("### 🧠 답변  `RAG: ON`")                                 # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
+                    st.markdown("### 🤖 답변  `RAG: ON`")                                 # Streamlit UI 페이지의 결과 영역에 마크다운으로 소제목을 출력
                     # st.write(answer)                                                  # st.write(answer)는 마크다운/리치 텍스트를 렌더링할 수 있고, 포맷 유지가고 글꼴/스타일 차이 발생 가능
                     st.text(answer)                                                     # st.text(answer)는 한글/영문 서식을 제거하고 순수 텍스트(포맷 없이)로 표시
                   
