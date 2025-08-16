@@ -360,6 +360,11 @@ def _sidebar_config():
     chunk_size = st.sidebar.slider("chunk_size", 200, 2000, DEFAULT_CONFIG["chunk_size"], step=50)
     chunk_overlap = st.sidebar.slider("chunk_overlap", 0, 400, DEFAULT_CONFIG["chunk_overlap"], step=20)
 
+    # ★ 추가: OpenAI API 키 입력 팝업 (입력 시 즉시 환경변수에 설정)
+    api_key_input = st.sidebar.text_input("OPENAI_API_KEY (OpenAI 사용 시 필수)", type="password", help="OpenAI LLM/임베딩 사용 시 입력하세요")
+    if api_key_input:
+        os.environ["OPENAI_API_KEY"] = api_key_input
+
     return {
         **DEFAULT_CONFIG,
         "embeddings": emb_key,
@@ -376,6 +381,10 @@ def main():
     st.title("📚 RAG Single-File Template — 모듈 교체형")
 
     cfg = _sidebar_config()
+
+    # ★ 추가: OpenAI 선택됐는데 키가 없으면 사이드바 경고
+    if (cfg["llm"].startswith("openai:") or cfg["embeddings"] == "openai") and not os.getenv("OPENAI_API_KEY"):
+        st.sidebar.warning("OpenAI 사용 시 OPENAI_API_KEY를 입력하세요.")
 
     st.markdown("""
     **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
