@@ -211,7 +211,9 @@ class FaissVS(VectorStoreProvider):
             from langchain_community.vectorstores import FAISS
         except Exception as e:
             raise RuntimeError("FAISS 사용을 위해 'faiss-cpu'와 'langchain-community'가 필요합니다.") from e
-        self.vs = FAISS.from_documents(docs, embeddings)  # embeddings는 langchain 임베딩 호환 필요
+        # ★ 수정: LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
+        embed_impl = getattr(embeddings, "_impl", embeddings)
+        self.vs = FAISS.from_documents(docs, embed_impl)
         return self
     def as_retriever(self, **kwargs):
         return self.vs.as_retriever(**kwargs)
@@ -228,8 +230,9 @@ class ChromaVS(VectorStoreProvider):
             from langchain_community.vectorstores import Chroma
         except Exception as e:
             raise RuntimeError("Chroma 사용을 위해 'chromadb'와 'langchain-community'가 필요합니다.") from e
-        # langchain의 Chroma 래퍼는 임베딩 객체(호환형)를 인자로 받음
-        self.vs = Chroma.from_documents(docs, embeddings)
+        # ★ 수정: 내부 임베딩 구현체를 전달하여 호환성 보장
+        embed_impl = getattr(embeddings, "_impl", embeddings)
+        self.vs = Chroma.from_documents(docs, embed_impl)
         return self
     def as_retriever(self, **kwargs):
         return self.vs.as_retriever(**kwargs)
@@ -430,13 +433,16 @@ def main():
             if not chain:
                 st.warning("먼저 문서 인덱싱을 수행하세요.")
             else:
-                try:
-                    res = chain.invoke({"question": q})  # langchain 0.2+ invoke
-                except Exception:
-                    # 일부 버전에서는 __call__ 사용
-                    res = chain({"question": q})
-                answer = res.get("answer") or res.get("result")
-                st.write(answer)
+                if not q or not q.strip():
+                    st.warning("질문을 입력하세요.")
+                else:
+                    try:
+                        res = chain.invoke({"question": q})  # langchain 0.2+ invoke
+                    except Exception:
+                        # 일부 버전에서는 __call__ 사용
+                        res = chain({"question": q})
+                    answer = res.get("answer") or res.get("result")
+                    st.write(answer)
 
 
 if __name__ == "__main__":
