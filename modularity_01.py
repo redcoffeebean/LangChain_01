@@ -273,7 +273,6 @@ class FaissVS(VectorStoreProvider):
             from langchain_community.vectorstores import FAISS
         except Exception as e:
             raise RuntimeError("FAISS 사용을 위해 'faiss-cpu'와 'langchain-community'가 필요합니다.") from e
-        # ★ 수정: LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
         embed_impl = getattr(embeddings, "_impl", embeddings)
         self.vs = FAISS.from_documents(docs, embed_impl)
         return self
@@ -305,13 +304,11 @@ class ChromaVS(VectorStoreProvider):
             self.vs = FAISS.from_documents(docs, embed_impl)
             return self
 
-        # 내부 임베딩 구현체를 전달하여 호환성 보장
         embed_impl = getattr(embeddings, "_impl", embeddings)
         try:
             self.vs = Chroma.from_documents(docs, embed_impl, collection_name=self.collection_name)
             return self
         except Exception as e:
-            # 런타임에서 sqlite 관련 에러가 난 경우에도 FAISS로 폴백
             if "sqlite" in str(e).lower():
                 try:
                     import streamlit as st
@@ -377,7 +374,6 @@ class PineconeVS(VectorStoreProvider):
                     spec=ServerlessSpec(cloud=cloud, region=region),
                 )
             else:
-                # 구 SDK 호환 (serverless spec 없이)
                 pc.create_index(name=self.index_name, dimension=dim, metric=metric)
 
         embed_impl = getattr(embeddings, "_impl", embeddings)
@@ -401,15 +397,11 @@ class OracleVectorVS(VectorStoreProvider):
     def __init__(self):
         self.ready = False
     def from_documents(self, docs, embeddings):
-        # TODO: docs → (id, text, embedding) 변환 후 Oracle 테이블 업서트 + 벡터 인덱스 생성
-        # 예시) embedding = embeddings.embed_documents([d.page_content for d in docs])
-        #       cx_Oracle/oracledb 사용, VECTOR 컬럼과 HNSW 인덱스 구성
         self.ready = True
         return self
     def as_retriever(self, **kwargs):
         if not self.ready:
             raise RuntimeError("OracleVectorVS가 초기화되지 않았습니다.")
-        # TODO: 질의 임베딩 후 SQL로 top-k 검색, 결과를 langchain Document로 어댑트
         raise NotImplementedError("Oracle Vector Search 어댑터 구현 필요")
     def persist(self):
         pass
@@ -460,11 +452,9 @@ def get_llm(name: str) -> LLMProvider:
 
 def build_chain(vs_provider: VectorStoreProvider, llm_provider: LLMProvider):
     try:
-        # LangChain 0.2+ 경로 우선
         from langchain.chains import ConversationalRetrievalChain
         from langchain.memory import ConversationBufferMemory
     except Exception:
-        # 일부 구버전 호환 (필요 시 다른 import)
         from langchain.chains import ConversationalRetrievalChain
         from langchain.memory import ConversationBufferMemory
 
@@ -594,7 +584,8 @@ def render_faiss_dashboard(cfg):
     st.header("📊 FAISS Dashboard")
     st.caption(
         "이 화면은 벡터 인덱스(FAISS)의 상태, 구성, 성능, 관리 기능을 한 번에 보여줍니다. "
-        "문서 업로드→인덱싱 후 여기서 현황을 확인하세요.")
+        "문서 업로드→인덱싱 후 여기서 현황을 확인하세요."
+    )
 
     vs_provider = st.session_state.get("_vs_provider")
     if not vs_provider:
@@ -642,12 +633,14 @@ def render_faiss_dashboard(cfg):
         {"Key": "Chunk Overlap", "Value": cfg["chunk_overlap"]},
         {"Key": "LLM", "Value": cfg["llm"]},
     ])
-    st.caption(
-        "• VectorStore: 실제 검색 백엔드"
-        "• Index Type: 인덱스 구조(예: IndexFlatL2 — 정확하지만 큰 데이터에서 느릴 수 있음)"
-        "• Embeddings: 임베딩 모델 (차원·성능 지표 차이에 영향)"
-        "• Splitter/Chunk Size/Overlap: 분할 전략과 크기 (검색 품질·인덱스 크기·속도에 영향)"
-        "• LLM: 최종 답변을 생성하는 모델 (응답 속도·비용·품질에 영향)")
+    st.caption("""\
+• VectorStore: 실제 검색 백엔드
+• Index Type: 인덱스 구조(예: IndexFlatL2 — 정확하지만 큰 데이터에서 느릴 수 있음)
+• Embeddings: 임베딩 모델 (차원·성능 지표 차이에 영향)
+• Splitter/Chunk Size/Overlap: 분할 전략과 크기 (검색 품질·인덱스 크기·속도에 영향)
+• LLM: 최종 답변을 생성하는 모델 (응답 속도·비용·품질에 영향)
+""")
+
     # --- 성능 정보 ---
     st.subheader("성능 정보")
     perf = st.session_state.get("_perf", {})
@@ -672,16 +665,19 @@ def render_faiss_dashboard(cfg):
             st.caption("여기에 시간이 누적되도록, 오른쪽 ‘대화’ 섹션에서 질문을 실행해 보세요.")
 
     with st.expander("🔧 튜닝 팁/설명 더보기"):
-        st.markdown(
-            "- **느린 경우**: retriever `k`를 5→3으로 낮추거나, 더 가벼운 LLM을 선택하세요. 초기 몇 번은 모델/런타임 워밍업으로 오래 걸릴 수 있습니다."
-            "- **대용량 데이터**: IndexFlatL2 대신 IVF/IVFPQ/HNSW 같은 ANN 인덱스를 검토하세요(정확도 일부 희생, 속도/메모리 절감)."
-            "- **정확도 향상**: chunk_size를 문서 특성에 맞춰 조정하고, MMR/메타 필터링/프롬프트 개선을 병행하세요."
-            "- **코사인 유사도**: 벡터를 L2 정규화하고 Inner Product(IP)로 검색하면 코사인과 동일 효과를 얻을 수 있습니다.")
+        st.markdown("""\
+- **느린 경우**: retriever `k`를 5→3으로 낮추거나, 더 가벼운 LLM을 선택하세요. 초기 몇 번은 모델/런타임 워밍업으로 오래 걸릴 수 있습니다.
+- **대용량 데이터**: IndexFlatL2 대신 IVF/IVFPQ/HNSW 같은 ANN 인덱스를 검토하세요(정확도 일부 희생, 속도/메모리 절감).
+- **정확도 향상**: chunk_size를 문서 특성에 맞춰 조정하고, MMR/메타 필터링/프롬프트 개선을 병행하세요.
+- **코사인 유사도**: 벡터를 L2 정규화하고 Inner Product(IP)로 검색하면 코사인과 동일 효과를 얻을 수 있습니다.
+""")
+
     # --- 관리(저장/불러오기) ---
     st.subheader("관리")
-    st.caption(
-        "‘FAISS 저장’은 index.faiss(인덱스) + docstore.pkl + index_to_docstore_id.pkl을 지정 폴더에 기록합니다."
-        "‘FAISS 불러오기’는 해당 파일들을 읽어 인덱스를 복원하고, 체인을 자동으로 재빌드합니다." )
+    st.caption("""\
+‘FAISS 저장’은 index.faiss(인덱스) + docstore.pkl + index_to_docstore_id.pkl을 지정 폴더에 기록합니다.
+‘FAISS 불러오기’는 해당 파일들을 읽어 인덱스를 복원하고, 체인을 자동으로 재빌드합니다.
+""")
     save_col, load_col = st.columns(2)
     with save_col:
         save_dir = st.text_input("저장 폴더", value=st.session_state.get("_faiss_save_dir", "./faiss_store"), key="faiss_save_dir")
@@ -726,9 +722,10 @@ def render_faiss_dashboard(cfg):
     else:
         st.write("메타데이터가 없습니다. 인덱싱을 한 번 수행해 보세요.")
 
+
 def main():
-    st.set_page_config(page_title="RAG Single-File Template", page_icon="📚", layout="wide")
-    st.title("📚 RAG Single-File Template — 모듈 교체형")
+    st.set_page_config(page_title="Modular RAG Template", page_icon="📚", layout="wide")
+    st.title("📚 Modular RAG Template")
 
     cfg = _sidebar_config()
 
@@ -750,12 +747,9 @@ def main():
     st.markdown("""
 **RAG-Corpus:**
 
-
 Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
 
-
 **Query-Serving:**
-
 
 Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer
     """)
@@ -765,8 +759,8 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
     build_col, chat_col = st.columns([1, 2])
 
     with build_col:
-        st.subheader("1) 인덱스 빌드")
-        if st.button("문서 인덱싱 시작", use_container_width=True):
+        st.subheader("1) Vector Index")
+        if st.button("Vector Index Build", use_container_width=True):
             if not uploaded_files:
                 st.error("최소 1개 파일을 업로드하세요.")
             else:
@@ -812,9 +806,9 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                     st.exception(e)
 
     with chat_col:
-        st.subheader("2) 대화")
-        q = st.text_input("질문 입력")
-        if st.button("질의", use_container_width=True):
+        st.subheader("2) Query")
+        q = st.text_input("질문입력")
+        if st.button("질문하기", use_container_width=True):
             chain = st.session_state.get("_chain")
             if not chain:
                 st.warning("먼저 문서 인덱싱을 수행하세요.")
@@ -826,7 +820,6 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                     try:
                         res = chain.invoke({"question": q})  # langchain 0.2+ invoke
                     except Exception:
-                        # 일부 버전에서는 __call__ 사용
                         res = chain({"question": q})
                     t1 = time.perf_counter()
 
@@ -834,7 +827,6 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                     perf = st.session_state.get("_perf", {})
                     q_times = perf.setdefault("query_times", [])
                     q_times.append(t1 - t0)
-                    # 최근 50개만 유지
                     if len(q_times) > 50:
                         q_times[:] = q_times[-50:]
                     st.session_state["_perf"] = perf
