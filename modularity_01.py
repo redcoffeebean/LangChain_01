@@ -673,20 +673,15 @@ def render_faiss_dashboard(cfg):
 
     with st.expander("🔧 튜닝 팁/설명 더보기"):
         st.markdown(
-            "- **느린 경우**: retriever `k`를 5→3으로 낮추거나, 더 가벼운 LLM을 선택하세요. 초기 몇 번은 모델/런타임 워밍업으로 오래 걸릴 수 있습니다.
-"
-            "- **대용량 데이터**: IndexFlatL2 대신 IVF/IVFPQ/HNSW 같은 ANN 인덱스를 검토하세요(정확도 일부 희생, 속도/메모리 절감).
-"
-            "- **정확도 향상**: chunk_size를 문서 특성에 맞춰 조정하고, MMR/메타 필터링/프롬프트 개선을 병행하세요.
-"
+            "- **느린 경우**: retriever `k`를 5→3으로 낮추거나, 더 가벼운 LLM을 선택하세요. 초기 몇 번은 모델/런타임 워밍업으로 오래 걸릴 수 있습니다."
+            "- **대용량 데이터**: IndexFlatL2 대신 IVF/IVFPQ/HNSW 같은 ANN 인덱스를 검토하세요(정확도 일부 희생, 속도/메모리 절감)."
+            "- **정확도 향상**: chunk_size를 문서 특성에 맞춰 조정하고, MMR/메타 필터링/프롬프트 개선을 병행하세요."
             "- **코사인 유사도**: 벡터를 L2 정규화하고 Inner Product(IP)로 검색하면 코사인과 동일 효과를 얻을 수 있습니다.")
-
     # --- 관리(저장/불러오기) ---
     st.subheader("관리")
     st.caption(
-        "‘FAISS 저장’은 index.faiss(인덱스) + docstore.pkl + index_to_docstore_id.pkl을 지정 폴더에 기록합니다.
-"
-        "‘FAISS 불러오기’는 해당 파일들을 읽어 인덱스를 복원하고, 체인을 자동으로 재빌드합니다.")
+        "‘FAISS 저장’은 index.faiss(인덱스) + docstore.pkl + index_to_docstore_id.pkl을 지정 폴더에 기록합니다."
+        "‘FAISS 불러오기’는 해당 파일들을 읽어 인덱스를 복원하고, 체인을 자동으로 재빌드합니다." )
     save_col, load_col = st.columns(2)
     with save_col:
         save_dir = st.text_input("저장 폴더", value=st.session_state.get("_faiss_save_dir", "./faiss_store"), key="faiss_save_dir")
