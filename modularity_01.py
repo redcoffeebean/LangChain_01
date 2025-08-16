@@ -278,9 +278,9 @@ def _sidebar_config():
     st.sidebar.header("모듈 선택")
 
     emb_label = st.sidebar.selectbox(
-        "Embeddings", options=[x[0] for x in UI_CHOICES["Embeddings"]], index=0,
+        "Embeddings", options=[x[0] for x in UI_CHOICES["Embedding Model"]], index=0,
     )
-    emb_key = dict(UI_CHOICES["Embeddings"])[emb_label]
+    emb_key = dict(UI_CHOICES["Embedding Model"])[emb_label]
 
     vector_candidates = [("FAISS (in-memory)", "faiss")]
     chroma_available = is_pkg_available("chromadb")
@@ -297,8 +297,8 @@ def _sidebar_config():
     sp_label = st.sidebar.selectbox("Splitter", options=[x[0] for x in UI_CHOICES["Splitter"]], index=0)
     sp_key = dict(UI_CHOICES["Splitter"])[sp_label]
 
-    llm_label = st.sidebar.selectbox("LLM", options=[x[0] for x in UI_CHOICES["LLM"]], index=0)
-    llm_key = dict(UI_CHOICES["LLM"])[llm_label]
+    llm_label = st.sidebar.selectbox("LLM", options=[x[0] for x in UI_CHOICES["LLM Model"]], index=0)
+    llm_key = dict(UI_CHOICES["LLM Model"])[llm_label]
 
     chunk_size = st.sidebar.slider("chunk_size", 200, 2000, DEFAULT_CONFIG["chunk_size"], step=50)
     chunk_overlap = st.sidebar.slider("chunk_overlap", 0, 400, DEFAULT_CONFIG["chunk_overlap"], step=20)
