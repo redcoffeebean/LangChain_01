@@ -560,6 +560,7 @@ def main():
     st.markdown("""
 **RAG-Corpus:**
 Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
+<br>
 **Query-Serving:**
 Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer → History
     """)
