@@ -31,6 +31,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import List, Dict, Any, Callable
+import importlib.util
 
 DEFAULT_CONFIG = {
     "embeddings": "hf:minilm",   # 'hf:minilm' | 'hf:paraphrase' | 'openai'
@@ -75,6 +76,13 @@ class LoadedDoc:
 def _ensure(msg: str, ok: bool):
     if not ok:
         raise RuntimeError(msg)
+
+# 패키지 설치 여부 체크 (예: chromadb 유무에 따라 UI에서 자동 대체)
+def is_pkg_available(module_name: str) -> bool:
+    try:
+        return importlib.util.find_spec(module_name) is not None
+    except Exception:
+        return False
 
 
 # ##################################################
@@ -339,12 +347,24 @@ def _sidebar_config():
     )
     emb_key = dict(UI_CHOICES["Embeddings"])[emb_label]
 
+    # VectorStore 선택지: chromadb 미설치 시 라벨 안내 및 자동 대체
+    vector_candidates = [("FAISS (in-memory)", "faiss")]
+    chroma_available = is_pkg_available("chromadb")
+    if chroma_available:
+        vector_candidates.append(("ChromaDB (local client)", "chroma"))
+    else:
+        vector_candidates.append(("ChromaDB (미설치 — 자동으로 FAISS 사용)", "chroma"))
+
     vs_label = st.sidebar.selectbox(
         "VectorStore",
-        options=[x[0] for x in UI_CHOICES["VectorStore"]],
+        options=[x[0] for x in vector_candidates],
         index=0,
     )
-    vs_key = dict(UI_CHOICES["VectorStore"])[vs_label]
+    vs_key_requested = dict(vector_candidates)[vs_label]  # 사용자가 선택한 키 (요청값)
+    vs_key_effective = vs_key_requested
+    if vs_key_requested == "chroma" and not chroma_available:
+        st.sidebar.info("ChromaDB가 설치되어 있지 않아 **FAISS**로 자동 대체합니다. 설치: `pip install chromadb`.")
+        vs_key_effective = "faiss"
 
     sp_label = st.sidebar.selectbox(
         "Splitter",
@@ -363,15 +383,16 @@ def _sidebar_config():
     chunk_size = st.sidebar.slider("chunk_size", 200, 2000, DEFAULT_CONFIG["chunk_size"], step=50)
     chunk_overlap = st.sidebar.slider("chunk_overlap", 0, 400, DEFAULT_CONFIG["chunk_overlap"], step=20)
 
-    # ★ 추가: OpenAI API 키 입력 팝업 (입력 시 즉시 환경변수에 설정)
-    api_key_input = st.sidebar.text_input("OPENAI_API_KEY (OpenAI 사용 시 필수)", type="password", help="OpenAI LLM/임베딩 사용 시 입력하세요")
+    # OpenAI API 키 입력 (입력 시 즉시 환경변수에 반영)
+    api_key_input = st.sidebar.text_input("OPENAI_API_KEY (OpenAI 사용 시 필수)", type="password", help="OpenAI LLM/임베딩 사용 시 입력")
     if api_key_input:
         os.environ["OPENAI_API_KEY"] = api_key_input
 
     return {
         **DEFAULT_CONFIG,
         "embeddings": emb_key,
-        "vectorstore": vs_key,
+        "vectorstore": vs_key_effective,
+        "requested_vectorstore": vs_key_requested,  # 사용자가 선택한 원래 값 기록
         "splitter": sp_key,
         "llm": llm_key,
         "chunk_size": chunk_size,
@@ -388,6 +409,9 @@ def main():
     # ★ 추가: OpenAI 선택됐는데 키가 없으면 사이드바 경고
     if (cfg["llm"].startswith("openai:") or cfg["embeddings"] == "openai") and not os.getenv("OPENAI_API_KEY"):
         st.sidebar.warning("OpenAI 사용 시 OPENAI_API_KEY를 입력하세요.")
+    # VectorStore 대체 안내 (사용자가 Chroma를 요청했지만 설치가 없어 FAISS로 치환된 경우)
+    if cfg.get("requested_vectorstore") == "chroma" and cfg["vectorstore"] != "chroma":
+        st.sidebar.warning("ChromaDB 미설치로 **FAISS**로 자동 대체했습니다. 설치 후 다시 선택하세요: `pip install chromadb`.")
 
     st.markdown("""
     **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
