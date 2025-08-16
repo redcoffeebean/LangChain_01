@@ -1,5 +1,5 @@
 chromadb
-sqlite3>=3.35.0
+sqlite3>=3.35
 
 # 기본
 streamlit>=1.32
