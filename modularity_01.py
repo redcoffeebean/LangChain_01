@@ -31,7 +31,7 @@ DEFAULT_CONFIG = {
 }
 
 UI_CHOICES = {
-    "Embeddings": [
+    "Embedding Model": [
         ("HuggingFace — all-MiniLM-L6-v2", "hf:minilm"),
         ("HuggingFace — paraphrase-MiniLM-L6-v2", "hf:paraphrase"),
         ("OpenAI — text-embedding-3-large", "openai"),
@@ -45,7 +45,7 @@ UI_CHOICES = {
         ("tiktoken 기반 TokenSplitter", "tiktoken"),
         ("문자 기반 RecursiveCharacter", "char"),
     ],
-    "LLM": [
+    "LLM Model": [
         ("OpenAI — gpt-4o-mini", "openai:gpt-4o-mini"),
     ],
 }
