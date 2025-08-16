@@ -444,7 +444,7 @@ import streamlit as st
 
 
 def _sidebar_config():
-    st.sidebar.header("구성 선택 (한 파일 내 교체)")
+    st.sidebar.header("모듈 설")
 
     emb_label = st.sidebar.selectbox(
         "Embeddings",
@@ -542,8 +542,8 @@ def _sidebar_config():
 
 
 def main():
-    st.set_page_config(page_title="RAG Single-File Template", page_icon="📚", layout="wide")
-    st.title("📚 RAG Single-File Template — 모듈 교체형")
+    st.set_page_config(page_title="Modular RAG Template", page_icon="📚", layout="wide")
+    st.title("📚 Modular RAG Template")
 
     cfg = _sidebar_config()
 
@@ -558,9 +558,10 @@ def main():
         )
 
     st.markdown("""
-    **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
-    
-    좌측에서 구현체를 바꾸면 한 파일 안에서 즉시 교체가 가능합니다.
+**RAG-Corpus:**
+Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
+**Query-Serving:**
+Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer → History
     """)
 
     uploaded_files = st.file_uploader("문서 업로드 (PDF/DOCX/PPT/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
@@ -568,8 +569,8 @@ def main():
     build_col, chat_col = st.columns([1, 2])
 
     with build_col:
-        st.subheader("1) 인덱스 빌드")
-        if st.button("문서 인덱싱 시작", use_container_width=True):
+        st.subheader("1) Vector Index")
+        if st.button("Vector Index Build", use_container_width=True):
             if not uploaded_files:
                 st.error("최소 1개 파일을 업로드하세요.")
             else:
@@ -594,7 +595,7 @@ def main():
                     st.exception(e)
 
     with chat_col:
-        st.subheader("2) 대화")
+        st.subheader("Query")
         q = st.text_input("질문 입력")
         if st.button("질의", use_container_width=True):
             chain = st.session_state.get("_chain")
