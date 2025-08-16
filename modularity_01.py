@@ -101,6 +101,43 @@ def is_sqlite_supported(min_major=3, min_minor=35, min_patch=0) -> bool:
     except Exception:
         return False
 
+# --- Helper: 현재 VectorStore가 실질적으로 FAISS인지 판단 (Chroma 내부 폴백 포함) ---
+def is_faiss_backed(provider) -> bool:
+    try:
+        from langchain_community.vectorstores import FAISS as FAISSClass
+    except Exception:
+        FAISSClass = None
+    if isinstance(provider, FaissVS):
+        return True
+    vsv = getattr(provider, "vs", None)
+    if vsv is None:
+        return False
+    if FAISSClass is not None and isinstance(vsv, FAISSClass):
+        return True
+    # Heuristic: FAISS 인덱스는 .index.ntotal 특성이 존재
+    idx = getattr(vsv, "index", None)
+    return hasattr(idx, "ntotal")
+
+# --- Helper: 실제 사용 중인 VectorStore 이름 ---
+def effective_vs_name(provider) -> str:
+    if is_faiss_backed(provider):
+        return "faiss"
+    # Chroma/Pinecone 감지 (가능하면)
+    vsv = getattr(provider, "vs", None)
+    try:
+        from langchain_community.vectorstores import Chroma
+        if isinstance(vsv, Chroma):
+            return "chroma"
+    except Exception:
+        pass
+    try:
+        from langchain_pinecone import PineconeVectorStore
+        if isinstance(vsv, PineconeVectorStore):
+            return "pinecone"
+    except Exception:
+        pass
+    return type(provider).__name__
+
 
 # ##################################################
 # 3) Loader 구현 — PDF/DOCX/PPT/TXT (langchain-community 권장)
@@ -556,8 +593,11 @@ def _sidebar_config():
 def render_faiss_dashboard(cfg):
     st.header("📊 FAISS Dashboard")
     vs_provider = st.session_state.get("_vs_provider")
-    if not isinstance(vs_provider, FaissVS):
-        st.info("현재 VectorStore가 FAISS가 아닙니다. 사이드바에서 VectorStore를 FAISS로 선택하고 인덱스를 빌드하세요.")
+    if not vs_provider:
+        st.info("아직 VectorStore가 준비되지 않았습니다. 먼저 인덱스를 빌드하세요.")
+        return
+    if not is_faiss_backed(vs_provider):
+        st.info("현재 VectorStore가 FAISS 기반이 아닙니다. 사이드바에서 FAISS를 선택하거나, Chroma가 내부적으로 FAISS로 폴백되지 않았는지 확인하세요.")
         return
     vsv = getattr(vs_provider, "vs", None)
     index = getattr(vsv, "index", None) if vsv else None
@@ -723,11 +763,12 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
 
                     # 상태 저장
                     st.session_state["_vs_provider"] = vs
+                    used_name = effective_vs_name(vs)
                     st.session_state["_faiss_meta"] = {
                         "files": [uf.name for uf in uploaded_files],
                         "num_docs": len(docs),
                         "num_chunks": len(splits),
-                        "vectorstore_used": cfg["vectorstore"],
+                        "vectorstore_used": used_name,
                     }
                     perf = st.session_state.get("_perf", {})
                     perf["chunk_time_s"] = t_split1 - t_split0
