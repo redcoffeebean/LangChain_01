@@ -84,6 +84,22 @@ def is_pkg_available(module_name: str) -> bool:
     except Exception:
         return False
 
+# sqlite3 최소 버전(Chroma 안내: >= 3.35.0) 충족 여부
+def is_sqlite_supported(min_major=3, min_minor=35, min_patch=0) -> bool:
+    try:
+        import sqlite3
+        v = getattr(sqlite3, "sqlite_version_info", None)
+        if not v:
+            # 일부 환경은 문자열만 제공
+            ver = getattr(sqlite3, "sqlite_version", "0.0.0")
+            parts = [int(x) for x in ver.split(".")]
+            while len(parts) < 3:
+                parts.append(0)
+            v = tuple(parts[:3])
+        return tuple(v) >= (min_major, min_minor, min_patch)
+    except Exception:
+        return False
+
 
 # ##################################################
 # 3) Loader 구현 — PDF/DOCX/PPT/TXT (langchain-community 권장)
@@ -219,7 +235,7 @@ class FaissVS(VectorStoreProvider):
             from langchain_community.vectorstores import FAISS
         except Exception as e:
             raise RuntimeError("FAISS 사용을 위해 'faiss-cpu'와 'langchain-community'가 필요합니다.") from e
-        # ★ 수정: LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
+        # LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
         embed_impl = getattr(embeddings, "_impl", embeddings)
         self.vs = FAISS.from_documents(docs, embed_impl)
         return self
@@ -238,14 +254,41 @@ class ChromaVS(VectorStoreProvider):
             from langchain_community.vectorstores import Chroma
         except Exception as e:
             raise RuntimeError("Chroma 사용을 위해 'chromadb'와 'langchain-community'가 필요합니다.") from e
-        # ★ 수정: 내부 임베딩 구현체를 전달하여 호환성 보장
+
+        # sqlite 사전 점검: 미충족이면 즉시 예외 대신 FAISS로 폴백
+        if not is_sqlite_supported():
+            try:
+                import streamlit as st
+                st.warning("ChromaDB는 sqlite3 >= 3.35.0이 필요합니다. 환경이 미충족이라 **FAISS**로 자동 대체합니다.")
+            except Exception:
+                pass
+            from langchain_community.vectorstores import FAISS
+            embed_impl = getattr(embeddings, "_impl", embeddings)
+            self.vs = FAISS.from_documents(docs, embed_impl)
+            return self
+
+        # 내부 임베딩 구현체 전달
         embed_impl = getattr(embeddings, "_impl", embeddings)
-        self.vs = Chroma.from_documents(docs, embed_impl)
-        return self
+        try:
+            self.vs = Chroma.from_documents(docs, embed_impl, collection_name=self.collection_name)
+            return self
+        except Exception as e:
+            # 런타임에서 sqlite 관련 에러가 난 경우에도 FAISS로 폴백
+            if "sqlite" in str(e).lower():
+                try:
+                    import streamlit as st
+                    st.warning("ChromaDB(sqlite) 초기화 실패 → **FAISS**로 자동 대체합니다.")
+                except Exception:
+                    pass
+                from langchain_community.vectorstores import FAISS
+                self.vs = FAISS.from_documents(docs, embed_impl)
+                return self
+            raise
     def as_retriever(self, **kwargs):
         return self.vs.as_retriever(**kwargs)
     def persist(self):
         try:
+            # Chroma는 persist() 지원, FAISS로 폴백된 경우에는 no-op
             self.vs.persist()
         except Exception:
             pass
@@ -347,11 +390,15 @@ def _sidebar_config():
     )
     emb_key = dict(UI_CHOICES["Embeddings"])[emb_label]
 
-    # VectorStore 선택지: chromadb 미설치 시 라벨 안내 및 자동 대체
+    # VectorStore 선택지: chromadb 유무 + sqlite 지원 여부에 따라 라벨 안내 및 자동 대체
     vector_candidates = [("FAISS (in-memory)", "faiss")]
     chroma_available = is_pkg_available("chromadb")
+    sqlite_ok = is_sqlite_supported()
     if chroma_available:
-        vector_candidates.append(("ChromaDB (local client)", "chroma"))
+        if sqlite_ok:
+            vector_candidates.append(("ChromaDB (local client)", "chroma"))
+        else:
+            vector_candidates.append(("ChromaDB (SQLite<3.35 — 자동으로 FAISS 사용)", "chroma"))
     else:
         vector_candidates.append(("ChromaDB (미설치 — 자동으로 FAISS 사용)", "chroma"))
 
@@ -362,8 +409,11 @@ def _sidebar_config():
     )
     vs_key_requested = dict(vector_candidates)[vs_label]  # 사용자가 선택한 키 (요청값)
     vs_key_effective = vs_key_requested
-    if vs_key_requested == "chroma" and not chroma_available:
-        st.sidebar.info("ChromaDB가 설치되어 있지 않아 **FAISS**로 자동 대체합니다. 설치: `pip install chromadb`.")
+    if vs_key_requested == "chroma" and (not chroma_available or not sqlite_ok):
+        if not chroma_available:
+            st.sidebar.info("ChromaDB가 설치되어 있지 않아 **FAISS**로 자동 대체합니다. 설치: `pip install chromadb`.")
+        elif not sqlite_ok:
+            st.sidebar.info("현재 sqlite3 버전이 낮아 ChromaDB 사용이 제한됩니다 (>= 3.35.0 필요). **FAISS**로 자동 대체합니다.")
         vs_key_effective = "faiss"
 
     sp_label = st.sidebar.selectbox(
@@ -406,12 +456,13 @@ def main():
 
     cfg = _sidebar_config()
 
-    # ★ 추가: OpenAI 선택됐는데 키가 없으면 사이드바 경고
+    # OpenAI 선택됐는데 키가 없으면 사이드바 경고
     if (cfg["llm"].startswith("openai:") or cfg["embeddings"] == "openai") and not os.getenv("OPENAI_API_KEY"):
         st.sidebar.warning("OpenAI 사용 시 OPENAI_API_KEY를 입력하세요.")
-    # VectorStore 대체 안내 (사용자가 Chroma를 요청했지만 설치가 없어 FAISS로 치환된 경우)
+    # VectorStore 대체 안내 (사용자가 Chroma를 요청했지만 조건 미충족으로 FAISS로 치환된 경우)
     if cfg.get("requested_vectorstore") == "chroma" and cfg["vectorstore"] != "chroma":
-        st.sidebar.warning("ChromaDB 미설치로 **FAISS**로 자동 대체했습니다. 설치 후 다시 선택하세요: `pip install chromadb`.")
+        st.sidebar.warning("ChromaDB 사용 조건 미충족으로 **FAISS**로 자동 대체했습니다. "
+                           "ChromaDB 사용을 원하시면 `pip install chromadb` 후, sqlite3 >= 3.35.0 환경을 준비하세요.")
 
     st.markdown("""
     **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
