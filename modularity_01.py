@@ -314,7 +314,7 @@ def _sidebar_config():
         st.session_state["view"] = "faiss"
     if st.sidebar.button("RAG Mode", use_container_width=True):
         st.session_state["view"] = "rag"
-
+ 
     return {
         **DEFAULT_CONFIG,
         "embeddings": emb_key,
