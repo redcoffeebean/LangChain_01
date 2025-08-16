@@ -592,6 +592,10 @@ def _sidebar_config():
 
 def render_faiss_dashboard(cfg):
     st.header("📊 FAISS Dashboard")
+    st.caption(
+        "이 화면은 벡터 인덱스(FAISS)의 상태, 구성, 성능, 관리 기능을 한 번에 보여줍니다. "
+        "문서 업로드→인덱싱 후 여기서 현황을 확인하세요.")
+
     vs_provider = st.session_state.get("_vs_provider")
     if not vs_provider:
         st.info("아직 VectorStore가 준비되지 않았습니다. 먼저 인덱스를 빌드하세요.")
@@ -599,6 +603,7 @@ def render_faiss_dashboard(cfg):
     if not is_faiss_backed(vs_provider):
         st.info("현재 VectorStore가 FAISS 기반이 아닙니다. 사이드바에서 FAISS를 선택하거나, Chroma가 내부적으로 FAISS로 폴백되지 않았는지 확인하세요.")
         return
+
     vsv = getattr(vs_provider, "vs", None)
     index = getattr(vsv, "index", None) if vsv else None
     if index is None:
@@ -613,10 +618,18 @@ def render_faiss_dashboard(cfg):
     mem_mb = (ntotal * (dim or 0) * 4) / (1024 * 1024) if dim else None
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Vectors (ntotal)", ntotal)
-    c2.metric("Dimension (d)", dim if dim is not None else "-")
-    c3.metric("Metric", metric_guess)
-    c4.metric("Est. Memory (MB)", f"{mem_mb:.2f}" if mem_mb is not None else "-")
+    with c1:
+        st.metric("Vectors (ntotal)", ntotal)
+        st.caption("인덱스에 저장된 벡터(=청크) 개수. 많을수록 검색 후보가 늘어 정확도에 유리하지만, 검색/메모리 비용이 증가합니다.")
+    with c2:
+        st.metric("Dimension (d)", dim if dim is not None else "-")
+        st.caption("임베딩 벡터의 차원 수. 사용한 임베딩 모델에 의해 결정됩니다. (예: all-MiniLM-L6-v2 → 384)")
+    with c3:
+        st.metric("Metric", metric_guess)
+        st.caption("FAISS 인덱스의 거리/유사도 지표. IndexFlatL2는 L2(유클리드 거리), Inner Product는 IP로 표시됩니다.")
+    with c4:
+        st.metric("Est. Memory (MB)", f"{mem_mb:.2f}" if mem_mb is not None else "-")
+        st.caption("대략적인 벡터 저장 용량 추정치(ntotal×dim×4byte). 인덱스/메타 등 부가 오버헤드는 포함하지 않습니다.")
 
     # --- 구성 정보 ---
     st.subheader("구성 정보")
@@ -629,6 +642,16 @@ def render_faiss_dashboard(cfg):
         {"Key": "Chunk Overlap", "Value": cfg["chunk_overlap"]},
         {"Key": "LLM", "Value": cfg["llm"]},
     ])
+    st.caption(
+        "• VectorStore: 실제 검색 백엔드
+"
+        "• Index Type: 인덱스 구조(예: IndexFlatL2 — 정확하지만 큰 데이터에서 느릴 수 있음)
+"
+        "• Embeddings: 임베딩 모델 (차원·성능 지표 차이에 영향)
+"
+        "• Splitter/Chunk Size/Overlap: 분할 전략과 크기 (검색 품질·인덱스 크기·속도에 영향)
+"
+        "• LLM: 최종 답변을 생성하는 모델 (응답 속도·비용·품질에 영향)")
 
     # --- 성능 정보 ---
     st.subheader("성능 정보")
@@ -639,19 +662,36 @@ def render_faiss_dashboard(cfg):
 
     cols = st.columns(2)
     with cols[0]:
-        st.write("**인덱싱**")
+        st.markdown("**인덱싱**")
         st.write(f"- Chunking: {chunk_time:.3f}s" if isinstance(chunk_time, (int, float)) else "- Chunking: -")
         st.write(f"- FAISS.from_documents: {index_time:.3f}s" if isinstance(index_time, (int, float)) else "- FAISS.from_documents: -")
+        st.caption("Chunking은 문서를 청크로 나누는 시간, from_documents는 임베딩 계산 + 인덱스 빌드를 합친 시간입니다.")
     with cols[1]:
-        st.write("**질의 지연시간(최근)**")
+        st.markdown("**질의 지연시간(최근)**")
         if q_times:
             st.write(f"- count={len(q_times)}, avg={sum(q_times)/len(q_times):.3f}s, min={min(q_times):.3f}s, max={max(q_times):.3f}s")
             st.line_chart(q_times)
+            st.caption("질의 버튼을 누른 순간부터 답변이 나올 때까지의 총 소요 시간입니다. 검색 + LLM 호출/생성을 모두 포함합니다.")
         else:
             st.write("- 수집된 질의가 없습니다.")
+            st.caption("여기에 시간이 누적되도록, 오른쪽 ‘대화’ 섹션에서 질문을 실행해 보세요.")
+
+    with st.expander("🔧 튜닝 팁/설명 더보기"):
+        st.markdown(
+            "- **느린 경우**: retriever `k`를 5→3으로 낮추거나, 더 가벼운 LLM을 선택하세요. 초기 몇 번은 모델/런타임 워밍업으로 오래 걸릴 수 있습니다.
+"
+            "- **대용량 데이터**: IndexFlatL2 대신 IVF/IVFPQ/HNSW 같은 ANN 인덱스를 검토하세요(정확도 일부 희생, 속도/메모리 절감).
+"
+            "- **정확도 향상**: chunk_size를 문서 특성에 맞춰 조정하고, MMR/메타 필터링/프롬프트 개선을 병행하세요.
+"
+            "- **코사인 유사도**: 벡터를 L2 정규화하고 Inner Product(IP)로 검색하면 코사인과 동일 효과를 얻을 수 있습니다.")
 
     # --- 관리(저장/불러오기) ---
     st.subheader("관리")
+    st.caption(
+        "‘FAISS 저장’은 index.faiss(인덱스) + docstore.pkl + index_to_docstore_id.pkl을 지정 폴더에 기록합니다.
+"
+        "‘FAISS 불러오기’는 해당 파일들을 읽어 인덱스를 복원하고, 체인을 자동으로 재빌드합니다.")
     save_col, load_col = st.columns(2)
     with save_col:
         save_dir = st.text_input("저장 폴더", value=st.session_state.get("_faiss_save_dir", "./faiss_store"), key="faiss_save_dir")
@@ -689,12 +729,12 @@ def render_faiss_dashboard(cfg):
 
     # --- 문서/청크 메타 ---
     st.subheader("문서/청크 메타")
+    st.caption("업로드 파일, 문서/청크 수, 실제 사용된 VectorStore를 보여줍니다. Chroma 선택→환경 문제로 FAISS 폴백된 경우도 구분할 수 있습니다.")
     meta = st.session_state.get("_faiss_meta", {})
     if meta:
         st.json(meta)
     else:
         st.write("메타데이터가 없습니다. 인덱싱을 한 번 수행해 보세요.")
-
 
 def main():
     st.set_page_config(page_title="RAG Single-File Template", page_icon="📚", layout="wide")
