@@ -1,5 +1,7 @@
 chromadb
+sqlite3>=3.35.0
 
+# 기본
 streamlit>=1.32
 langchain>=0.2.0
 langchain-community>=0.2.0
