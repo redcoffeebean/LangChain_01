@@ -444,7 +444,7 @@ import streamlit as st
 
 
 def _sidebar_config():
-    st.sidebar.header("모듈 설")
+    st.sidebar.header("Module Setting")
 
     emb_label = st.sidebar.selectbox(
         "Embeddings",
