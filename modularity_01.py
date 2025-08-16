@@ -678,9 +678,16 @@ def main():
         )
 
     st.markdown("""
-    **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
-    
-    좌측에서 구현체를 바꾸면 한 파일 안에서 즉시 교체가 가능합니다.
+**RAG-Corpus:**
+
+
+Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
+
+
+**Query-Serving:**
+
+
+Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer
     """)
 
     uploaded_files = st.file_uploader("문서 업로드 (PDF/DOCX/PPT/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
