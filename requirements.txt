@@ -1,5 +1,6 @@
 chromadb
 #sqlite3>=3.35
+pinecone
 
 # 기본
 streamlit>=1.32
