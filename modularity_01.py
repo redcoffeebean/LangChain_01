@@ -473,7 +473,7 @@ import streamlit as st
 
 
 def _sidebar_config():
-    st.sidebar.header("구성 선택 (한 파일 내 교체)")
+    st.sidebar.header("모듈 선택")
 
     emb_label = st.sidebar.selectbox(
         "Embeddings",
