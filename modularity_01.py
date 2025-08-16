@@ -5,7 +5,7 @@
 #       각 기능을 구획하고, 설정(config) 또는 선택(selectbox)만 바꾸면 구현체를 교체할 수 있게 함.
 # 사용: Streamlit로 실행 (예: `streamlit run streamlit_rag_singlefile_template.py`)
 # 주의: 필요 라이브러리 설치
-#   pip install streamlit langchain-community langchain-text-splitters langchain-openai langchain-huggingface faiss-cpu chromadb tiktoken
+#   pip install streamlit langchain-community langchain-text-splitters langchain-openai langchain-huggingface faiss-cpu chromadb tiktoken langchain-pinecone pinecone
 #   (선택) transformers accelerate sentence-transformers
 # ==================================================
 
@@ -84,13 +84,12 @@ def is_pkg_available(module_name: str) -> bool:
     except Exception:
         return False
 
-# sqlite3 최소 버전(Chroma 안내: >= 3.35.0) 충족 여부
+# sqlite3 최소 버전(Chroma 요구: >= 3.35.0) 충족 여부 점검
 def is_sqlite_supported(min_major=3, min_minor=35, min_patch=0) -> bool:
     try:
         import sqlite3
         v = getattr(sqlite3, "sqlite_version_info", None)
         if not v:
-            # 일부 환경은 문자열만 제공
             ver = getattr(sqlite3, "sqlite_version", "0.0.0")
             parts = [int(x) for x in ver.split(".")]
             while len(parts) < 3:
@@ -219,7 +218,7 @@ def get_embeddings(name: str) -> EmbeddingsProvider:
 
 
 # ##################################################
-# 6) VectorStore 구현 — FAISS / Chroma / Oracle(placeholder)
+# 6) VectorStore 구현 — FAISS / Chroma / Pinecone / Oracle(placeholder)
 # ##################################################
 class VectorStoreProvider:
     def from_documents(self, docs: List[Any], embeddings: EmbeddingsProvider) -> "VectorStoreProvider": ...
@@ -235,7 +234,7 @@ class FaissVS(VectorStoreProvider):
             from langchain_community.vectorstores import FAISS
         except Exception as e:
             raise RuntimeError("FAISS 사용을 위해 'faiss-cpu'와 'langchain-community'가 필요합니다.") from e
-        # LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
+        # ★ 수정: LangChain 버전 차이를 흡수하기 위해 내부 임베딩 구현체를 전달
         embed_impl = getattr(embeddings, "_impl", embeddings)
         self.vs = FAISS.from_documents(docs, embed_impl)
         return self
@@ -255,11 +254,11 @@ class ChromaVS(VectorStoreProvider):
         except Exception as e:
             raise RuntimeError("Chroma 사용을 위해 'chromadb'와 'langchain-community'가 필요합니다.") from e
 
-        # sqlite 사전 점검: 미충족이면 즉시 예외 대신 FAISS로 폴백
+        # sqlite 버전이 낮으면 FAISS로 자동 폴백
         if not is_sqlite_supported():
             try:
                 import streamlit as st
-                st.warning("ChromaDB는 sqlite3 >= 3.35.0이 필요합니다. 환경이 미충족이라 **FAISS**로 자동 대체합니다.")
+                st.warning("ChromaDB는 sqlite3 >= 3.35.0이 필요합니다. 현재 환경에서는 **FAISS**로 자동 대체합니다.")
             except Exception:
                 pass
             from langchain_community.vectorstores import FAISS
@@ -267,7 +266,7 @@ class ChromaVS(VectorStoreProvider):
             self.vs = FAISS.from_documents(docs, embed_impl)
             return self
 
-        # 내부 임베딩 구현체 전달
+        # 내부 임베딩 구현체를 전달하여 호환성 보장
         embed_impl = getattr(embeddings, "_impl", embeddings)
         try:
             self.vs = Chroma.from_documents(docs, embed_impl, collection_name=self.collection_name)
@@ -288,10 +287,71 @@ class ChromaVS(VectorStoreProvider):
         return self.vs.as_retriever(**kwargs)
     def persist(self):
         try:
-            # Chroma는 persist() 지원, FAISS로 폴백된 경우에는 no-op
             self.vs.persist()
         except Exception:
             pass
+
+
+# ---- Pinecone VectorStore ----
+class PineconeVS(VectorStoreProvider):
+    def __init__(self, index_name: str):
+        self.index_name = index_name
+        self.vs = None
+
+    def _ensure_pkgs(self):
+        if not (is_pkg_available("langchain_pinecone") and is_pkg_available("pinecone")):
+            raise RuntimeError("Pinecone 사용을 위해 'langchain-pinecone'과 'pinecone' 패키지가 필요합니다.")
+
+    def from_documents(self, docs, embeddings):
+        self._ensure_pkgs()
+        from langchain_pinecone import PineconeVectorStore
+        try:
+            from pinecone import Pinecone as PineconeClient, ServerlessSpec
+        except Exception:
+            from pinecone import Pinecone as PineconeClient  # ServerlessSpec 미사용 구버전 호환
+            ServerlessSpec = None
+
+        api_key = os.getenv("PINECONE_API_KEY")
+        _ensure("PINECONE_API_KEY 환경변수 필요 (사이드바에 입력)", bool(api_key))
+
+        pc = PineconeClient(api_key=api_key)
+
+        # 인덱스 존재 여부 확인 → 없으면 생성
+        need_create = False
+        try:
+            pc.describe_index(self.index_name)
+        except Exception:
+            need_create = True
+
+        if need_create:
+            # 임베딩 차원 자동 추론
+            embed_impl = getattr(embeddings, "_impl", embeddings)
+            dim = len(embed_impl.embed_query("dimension_probe_for_pinecone"))
+            metric = "cosine"
+            cloud = os.getenv("PINECONE_CLOUD", "aws")
+            region = os.getenv("PINECONE_REGION", "us-east-1")
+            if ServerlessSpec is not None:
+                pc.create_index(
+                    name=self.index_name,
+                    dimension=dim,
+                    metric=metric,
+                    spec=ServerlessSpec(cloud=cloud, region=region),
+                )
+            else:
+                # 구 SDK 호환 (serverless spec 없이)
+                pc.create_index(name=self.index_name, dimension=dim, metric=metric)
+
+        embed_impl = getattr(embeddings, "_impl", embeddings)
+        self.vs = PineconeVectorStore.from_documents(
+            docs, embed_impl, index_name=self.index_name
+        )
+        return self
+
+    def as_retriever(self, **kwargs):
+        return self.vs.as_retriever(**kwargs)
+
+    def persist(self):
+        pass  # 원격 관리형
 
 
 class OracleVectorVS(VectorStoreProvider):
@@ -321,6 +381,9 @@ def get_vectorstore(name: str) -> VectorStoreProvider:
         return FaissVS()
     if name == "chroma":
         return ChromaVS()
+    if name == "pinecone":
+        idx = os.getenv("PINECONE_INDEX_NAME", "my-index")
+        return PineconeVS(index_name=idx)
     if name == "oracle":
         return OracleVectorVS()
     raise ValueError(f"Unknown vectorstore provider: {name}")
@@ -390,8 +453,9 @@ def _sidebar_config():
     )
     emb_key = dict(UI_CHOICES["Embeddings"])[emb_label]
 
-    # VectorStore 선택지: chromadb 유무 + sqlite 지원 여부에 따라 라벨 안내 및 자동 대체
+    # VectorStore 선택지: chromadb / pinecone 유무 + sqlite 지원 여부에 따라 라벨 안내 및 자동 대체
     vector_candidates = [("FAISS (in-memory)", "faiss")]
+
     chroma_available = is_pkg_available("chromadb")
     sqlite_ok = is_sqlite_supported()
     if chroma_available:
@@ -402,13 +466,40 @@ def _sidebar_config():
     else:
         vector_candidates.append(("ChromaDB (미설치 — 자동으로 FAISS 사용)", "chroma"))
 
+    pinecone_pkgs = is_pkg_available("langchain_pinecone") and is_pkg_available("pinecone")
+    if pinecone_pkgs:
+        vector_candidates.append(("Pinecone (managed)", "pinecone"))
+    else:
+        vector_candidates.append(("Pinecone (미설치 — 자동으로 FAISS 사용)", "pinecone"))
+
     vs_label = st.sidebar.selectbox(
         "VectorStore",
         options=[x[0] for x in vector_candidates],
         index=0,
     )
-    vs_key_requested = dict(vector_candidates)[vs_label]  # 사용자가 선택한 키 (요청값)
+    vs_key_requested = dict(vector_candidates)[vs_label]
     vs_key_effective = vs_key_requested
+
+    # Pinecone 설정 입력 (선택 시 표시)
+    if vs_key_requested == "pinecone":
+        pinecone_api = st.sidebar.text_input("PINECONE_API_KEY (Pinecone 선택 시 필수)", type="password")
+        if pinecone_api:
+            os.environ["PINECONE_API_KEY"] = pinecone_api
+        pinecone_idx = st.sidebar.text_input("PINECONE_INDEX_NAME", value=os.getenv("PINECONE_INDEX_NAME", "my-index"))
+        if pinecone_idx:
+            os.environ["PINECONE_INDEX_NAME"] = pinecone_idx
+        pinecone_cloud = st.sidebar.text_input("PINECONE_CLOUD (aws/gcp)", value=os.getenv("PINECONE_CLOUD", "aws"))
+        if pinecone_cloud:
+            os.environ["PINECONE_CLOUD"] = pinecone_cloud
+        pinecone_region = st.sidebar.text_input("PINECONE_REGION", value=os.getenv("PINECONE_REGION", "us-east-1"))
+        if pinecone_region:
+            os.environ["PINECONE_REGION"] = pinecone_region
+
+        if not pinecone_pkgs or not os.getenv("PINECONE_API_KEY"):
+            st.sidebar.info("Pinecone 패키지 또는 API 키가 없어 **FAISS**로 자동 대체합니다. 설치: `pip install langchain-pinecone pinecone`.")
+            vs_key_effective = "faiss"
+
+    # Chroma 사용 불가 조건 → FAISS로 자동 대체
     if vs_key_requested == "chroma" and (not chroma_available or not sqlite_ok):
         if not chroma_available:
             st.sidebar.info("ChromaDB가 설치되어 있지 않아 **FAISS**로 자동 대체합니다. 설치: `pip install chromadb`.")
@@ -442,7 +533,7 @@ def _sidebar_config():
         **DEFAULT_CONFIG,
         "embeddings": emb_key,
         "vectorstore": vs_key_effective,
-        "requested_vectorstore": vs_key_requested,  # 사용자가 선택한 원래 값 기록
+        "requested_vectorstore": vs_key_requested,
         "splitter": sp_key,
         "llm": llm_key,
         "chunk_size": chunk_size,
@@ -456,13 +547,15 @@ def main():
 
     cfg = _sidebar_config()
 
-    # OpenAI 선택됐는데 키가 없으면 사이드바 경고
+    # ★ 추가: OpenAI 선택됐는데 키가 없으면 사이드바 경고
     if (cfg["llm"].startswith("openai:") or cfg["embeddings"] == "openai") and not os.getenv("OPENAI_API_KEY"):
         st.sidebar.warning("OpenAI 사용 시 OPENAI_API_KEY를 입력하세요.")
-    # VectorStore 대체 안내 (사용자가 Chroma를 요청했지만 조건 미충족으로 FAISS로 치환된 경우)
-    if cfg.get("requested_vectorstore") == "chroma" and cfg["vectorstore"] != "chroma":
-        st.sidebar.warning("ChromaDB 사용 조건 미충족으로 **FAISS**로 자동 대체했습니다. "
-                           "ChromaDB 사용을 원하시면 `pip install chromadb` 후, sqlite3 >= 3.35.0 환경을 준비하세요.")
+    # VectorStore 대체 안내 (요청값과 실제 사용값이 다른 경우)
+    if cfg.get("requested_vectorstore") != cfg["vectorstore"]:
+        st.sidebar.warning(
+            f"요청한 VectorStore '{cfg.get('requested_vectorstore')}'을(를) 사용할 수 없어 "
+            f"**{cfg['vectorstore'].upper()}** 로 자동 대체했습니다. 필요한 패키지/키/환경을 확인하세요."
+        )
 
     st.markdown("""
     **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
