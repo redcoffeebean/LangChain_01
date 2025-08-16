@@ -18,7 +18,7 @@
 # 3) Loader 구현                               — PDF/DOCX/PPT/TXT
 # 4) Splitter 구현                             — tiktoken/char 기반
 # 5) Embeddings 구현                           — HuggingFace/OpenAI
-# 6) VectorStore 구현                          — FAISS/Chroma/(Oracle placeholder)
+# 6) VectorStore 구현                          — FAISS/Chroma/Pinecone/(Oracle placeholder)
 # 7) LLM 구현                                  — OpenAI(기본), (옵션) 로컬
 # 8) Chain Builder                             — ConversationalRetrievalChain 조립
 # 9) Streamlit UI                              — 파일 업로드, 구성 선택, 채팅
@@ -32,6 +32,7 @@ import os
 from dataclasses import dataclass
 from typing import List, Dict, Any, Callable
 import importlib.util
+import time, math
 
 DEFAULT_CONFIG = {
     "embeddings": "hf:minilm",   # 'hf:minilm' | 'hf:paraphrase' | 'openai'
@@ -52,6 +53,7 @@ UI_CHOICES = {
     "VectorStore": [
         ("FAISS (in-memory)", "faiss"),
         ("ChromaDB (local client)", "chroma"),
+        ("Pinecone (managed)", "pinecone"),
         ("Oracle Vector (placeholder)", "oracle"),
     ],
     "Splitter": [
@@ -444,7 +446,7 @@ import streamlit as st
 
 
 def _sidebar_config():
-    st.sidebar.header("Module Setting")
+    st.sidebar.header("구성 선택 (한 파일 내 교체)")
 
     emb_label = st.sidebar.selectbox(
         "Embeddings",
@@ -529,6 +531,15 @@ def _sidebar_config():
     if api_key_input:
         os.environ["OPENAI_API_KEY"] = api_key_input
 
+    # === View 전환 버튼 ===
+    if "view" not in st.session_state:
+        st.session_state["view"] = "rag"
+    st.sidebar.divider()
+    if st.sidebar.button("FAISS Dashboard"):
+        st.session_state["view"] = "faiss"
+    if st.sidebar.button("RAG Mode"):
+        st.session_state["view"] = "rag"
+
     return {
         **DEFAULT_CONFIG,
         "embeddings": emb_key,
@@ -538,14 +549,123 @@ def _sidebar_config():
         "llm": llm_key,
         "chunk_size": chunk_size,
         "chunk_overlap": chunk_overlap,
+        "view": st.session_state["view"],
     }
 
 
+def render_faiss_dashboard(cfg):
+    st.header("📊 FAISS Dashboard")
+    vs_provider = st.session_state.get("_vs_provider")
+    if not isinstance(vs_provider, FaissVS):
+        st.info("현재 VectorStore가 FAISS가 아닙니다. 사이드바에서 VectorStore를 FAISS로 선택하고 인덱스를 빌드하세요.")
+        return
+    vsv = getattr(vs_provider, "vs", None)
+    index = getattr(vsv, "index", None) if vsv else None
+    if index is None:
+        st.warning("FAISS 인덱스가 아직 준비되지 않았습니다. 먼저 인덱스를 빌드하세요.")
+        return
+
+    # --- 요약 메트릭 ---
+    ntotal = getattr(index, "ntotal", 0)
+    dim = getattr(index, "d", None)
+    index_type = type(index).__name__
+    metric_guess = "L2" if "L2" in index_type.upper() else ("IP" if "IP" in index_type.upper() else "?")
+    mem_mb = (ntotal * (dim or 0) * 4) / (1024 * 1024) if dim else None
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Vectors (ntotal)", ntotal)
+    c2.metric("Dimension (d)", dim if dim is not None else "-")
+    c3.metric("Metric", metric_guess)
+    c4.metric("Est. Memory (MB)", f"{mem_mb:.2f}" if mem_mb is not None else "-")
+
+    # --- 구성 정보 ---
+    st.subheader("구성 정보")
+    st.table([
+        {"Key": "VectorStore", "Value": "FAISS"},
+        {"Key": "Index Type", "Value": index_type},
+        {"Key": "Embeddings", "Value": cfg["embeddings"]},
+        {"Key": "Splitter", "Value": cfg["splitter"]},
+        {"Key": "Chunk Size", "Value": cfg["chunk_size"]},
+        {"Key": "Chunk Overlap", "Value": cfg["chunk_overlap"]},
+        {"Key": "LLM", "Value": cfg["llm"]},
+    ])
+
+    # --- 성능 정보 ---
+    st.subheader("성능 정보")
+    perf = st.session_state.get("_perf", {})
+    chunk_time = perf.get("chunk_time_s")
+    index_time = perf.get("index_time_s")
+    q_times = perf.get("query_times", [])
+
+    cols = st.columns(2)
+    with cols[0]:
+        st.write("**인덱싱**")
+        st.write(f"- Chunking: {chunk_time:.3f}s" if isinstance(chunk_time, (int, float)) else "- Chunking: -")
+        st.write(f"- FAISS.from_documents: {index_time:.3f}s" if isinstance(index_time, (int, float)) else "- FAISS.from_documents: -")
+    with cols[1]:
+        st.write("**질의 지연시간(최근)**")
+        if q_times:
+            st.write(f"- count={len(q_times)}, avg={sum(q_times)/len(q_times):.3f}s, min={min(q_times):.3f}s, max={max(q_times):.3f}s")
+            st.line_chart(q_times)
+        else:
+            st.write("- 수집된 질의가 없습니다.")
+
+    # --- 관리(저장/불러오기) ---
+    st.subheader("관리")
+    save_col, load_col = st.columns(2)
+    with save_col:
+        save_dir = st.text_input("저장 폴더", value=st.session_state.get("_faiss_save_dir", "./faiss_store"), key="faiss_save_dir")
+        if st.button("FAISS 저장"):
+            st.session_state["_faiss_save_dir"] = save_dir
+            try:
+                if hasattr(vsv, "save_local"):
+                    vsv.save_local(save_dir)
+                else:
+                    import faiss, pickle
+                    os.makedirs(save_dir, exist_ok=True)
+                    faiss.write_index(index, os.path.join(save_dir, "index.faiss"))
+                    with open(os.path.join(save_dir, "docstore.pkl"), "wb") as f:
+                        pickle.dump(vsv.docstore, f)
+                    with open(os.path.join(save_dir, "index_to_docstore_id.pkl"), "wb") as f:
+                        pickle.dump(vsv.index_to_docstore_id, f)
+                st.success(f"저장 완료: {save_dir}")
+            except Exception as e:
+                st.exception(e)
+    with load_col:
+        load_dir = st.text_input("불러오기 폴더", value=st.session_state.get("_faiss_load_dir", "./faiss_store"), key="faiss_load_dir")
+        if st.button("FAISS 불러오기"):
+            st.session_state["_faiss_load_dir"] = load_dir
+            try:
+                from langchain_community.vectorstores import FAISS as FAISSClass
+                emb = get_embeddings(cfg["embeddings"])
+                embed_impl = getattr(emb, "_impl", emb)
+                loaded = FAISSClass.load_local(load_dir, embed_impl, allow_dangerous_deserialization=True)
+                provider = FaissVS(); provider.vs = loaded
+                st.session_state["_vs_provider"] = provider
+                st.session_state["_chain"] = build_chain(provider, get_llm(cfg["llm"]))
+                st.success("불러오기 성공 및 체인 갱신 완료")
+            except Exception as e:
+                st.exception(e)
+
+    # --- 문서/청크 메타 ---
+    st.subheader("문서/청크 메타")
+    meta = st.session_state.get("_faiss_meta", {})
+    if meta:
+        st.json(meta)
+    else:
+        st.write("메타데이터가 없습니다. 인덱싱을 한 번 수행해 보세요.")
+
+
 def main():
-    st.set_page_config(page_title="Modular RAG Template", page_icon="📚", layout="wide")
-    st.title("📚 Modular RAG Template")
+    st.set_page_config(page_title="RAG Single-File Template", page_icon="📚", layout="wide")
+    st.title("📚 RAG Single-File Template — 모듈 교체형")
 
     cfg = _sidebar_config()
+
+    # 뷰 전환: FAISS Dashboard 모드
+    if cfg.get("view") == "faiss":
+        render_faiss_dashboard(cfg)
+        return
 
     # ★ 추가: OpenAI 선택됐는데 키가 없으면 사이드바 경고
     if (cfg["llm"].startswith("openai:") or cfg["embeddings"] == "openai") and not os.getenv("OPENAI_API_KEY"):
@@ -558,25 +678,18 @@ def main():
         )
 
     st.markdown("""
-**RAG-Corpus:**
-
-
-Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
-
-
-**Query-Serving:**
-
-
-Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer
+    **흐름:** Loader → Splitter → Embeddings → VectorStore → (Retriever) → LLM → Chain (ConversationalRetrieval) → 답변
+    
+    좌측에서 구현체를 바꾸면 한 파일 안에서 즉시 교체가 가능합니다.
     """)
 
-    uploaded_files = st.file_uploader("문서 업로드 (PDF/DOC/DOCX/PPT/PPTX/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("문서 업로드 (PDF/DOCX/PPT/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
 
     build_col, chat_col = st.columns([1, 2])
 
     with build_col:
-        st.subheader("1) Vector Index")
-        if st.button("Vector Index Build", use_container_width=True):
+        st.subheader("1) 인덱스 빌드")
+        if st.button("문서 인덱싱 시작", use_container_width=True):
             if not uploaded_files:
                 st.error("최소 1개 파일을 업로드하세요.")
             else:
@@ -590,10 +703,30 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                 try:
                     docs = load_documents(tmp_paths)
                     splitter = get_splitter(cfg["splitter"], cfg["chunk_size"], cfg["chunk_overlap"])
+                    # 성능 측정: split
+                    t_split0 = time.perf_counter()
                     splits = split_documents(docs, splitter)
+                    t_split1 = time.perf_counter()
 
+                    # 성능 측정: 벡터 인덱스 빌드
                     emb = get_embeddings(cfg["embeddings"])
+                    t_index0 = time.perf_counter()
                     vs = get_vectorstore(cfg["vectorstore"]).from_documents(splits, emb)
+                    t_index1 = time.perf_counter()
+
+                    # 상태 저장
+                    st.session_state["_vs_provider"] = vs
+                    st.session_state["_faiss_meta"] = {
+                        "files": [uf.name for uf in uploaded_files],
+                        "num_docs": len(docs),
+                        "num_chunks": len(splits),
+                        "vectorstore_used": cfg["vectorstore"],
+                    }
+                    perf = st.session_state.get("_perf", {})
+                    perf["chunk_time_s"] = t_split1 - t_split0
+                    perf["index_time_s"] = t_index1 - t_index0
+                    perf.setdefault("query_times", [])
+                    st.session_state["_perf"] = perf
 
                     st.session_state["_chain"] = build_chain(vs, get_llm(cfg["llm"]))
                     st.success("인덱싱 및 체인 준비 완료")
@@ -601,7 +734,7 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                     st.exception(e)
 
     with chat_col:
-        st.subheader("2) Query")
+        st.subheader("2) 대화")
         q = st.text_input("질문 입력")
         if st.button("질의", use_container_width=True):
             chain = st.session_state.get("_chain")
@@ -611,11 +744,23 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                 if not q or not q.strip():
                     st.warning("질문을 입력하세요.")
                 else:
+                    t0 = time.perf_counter()
                     try:
                         res = chain.invoke({"question": q})  # langchain 0.2+ invoke
                     except Exception:
                         # 일부 버전에서는 __call__ 사용
                         res = chain({"question": q})
+                    t1 = time.perf_counter()
+
+                    # 질의 성능 누적
+                    perf = st.session_state.get("_perf", {})
+                    q_times = perf.setdefault("query_times", [])
+                    q_times.append(t1 - t0)
+                    # 최근 50개만 유지
+                    if len(q_times) > 50:
+                        q_times[:] = q_times[-50:]
+                    st.session_state["_perf"] = perf
+
                     answer = res.get("answer") or res.get("result")
                     st.write(answer)
 
