@@ -601,7 +601,7 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
                     st.exception(e)
 
     with chat_col:
-        st.subheader("Query")
+        st.subheader("2) Query")
         q = st.text_input("질문 입력")
         if st.button("질의", use_container_width=True):
             chain = st.session_state.get("_chain")
