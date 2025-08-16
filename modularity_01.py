@@ -643,16 +643,11 @@ def render_faiss_dashboard(cfg):
         {"Key": "LLM", "Value": cfg["llm"]},
     ])
     st.caption(
-        "• VectorStore: 실제 검색 백엔드
-"
-        "• Index Type: 인덱스 구조(예: IndexFlatL2 — 정확하지만 큰 데이터에서 느릴 수 있음)
-"
-        "• Embeddings: 임베딩 모델 (차원·성능 지표 차이에 영향)
-"
-        "• Splitter/Chunk Size/Overlap: 분할 전략과 크기 (검색 품질·인덱스 크기·속도에 영향)
-"
+        "• VectorStore: 실제 검색 백엔드"
+        "• Index Type: 인덱스 구조(예: IndexFlatL2 — 정확하지만 큰 데이터에서 느릴 수 있음)"
+        "• Embeddings: 임베딩 모델 (차원·성능 지표 차이에 영향)"
+        "• Splitter/Chunk Size/Overlap: 분할 전략과 크기 (검색 품질·인덱스 크기·속도에 영향)"
         "• LLM: 최종 답변을 생성하는 모델 (응답 속도·비용·품질에 영향)")
-
     # --- 성능 정보 ---
     st.subheader("성능 정보")
     perf = st.session_state.get("_perf", {})
