@@ -567,10 +567,10 @@ Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector S
 **Query-Serving:**
 
 
-Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer → History
+Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer
     """)
 
-    uploaded_files = st.file_uploader("문서 업로드 (PDF/DOCX/PPT/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("문서 업로드 (PDF/DOC/DOCX/PPT/PPTX/TXT)", type=["pdf", "docx", "doc", "pptx", "ppt", "txt"], accept_multiple_files=True)
 
     build_col, chat_col = st.columns([1, 2])
 
