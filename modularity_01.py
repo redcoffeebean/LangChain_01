@@ -310,9 +310,9 @@ def _sidebar_config():
     if "view" not in st.session_state:
         st.session_state["view"] = "rag"
     st.sidebar.divider()
-    if st.sidebar.button("FAISS Dashboard"):
+    if st.sidebar.button("FAISS Dashboard", use_container_width=True):
         st.session_state["view"] = "faiss"
-    if st.sidebar.button("RAG Mode"):
+    if st.sidebar.button("RAG Mode", use_container_width=True):
         st.session_state["view"] = "rag"
 
     return {
