@@ -19,7 +19,7 @@ from loguru import logger          # Loguru — 깔끔하고 강력한 로깅 �
 # LangChain 핵심/유틸
 from langchain.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import SystemMessage, HumanMessage # LangChain에서 대화(채팅) 메시지 타입 두 개를 가져오는
+from langchain.schema import SystemMessage, HumanMessage # LangChain 대화 메시지 타입 
 
 # OpenAI / HF 연결 모듈 (계속 사용)
 from langchain_openai import ChatOpenAI
@@ -85,19 +85,20 @@ from langchain_community.document_loaders import (          # 여러 문서 로�
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # tiktoken 라이브러리 >> 내장인코딩(encoding)리소스 == 토그나이저 >> cl100k_base, r50k_base, p50k_base
-# 참고로 cl100k_base 코크나이저는 디코딩/인코딩 양방향 모두 가능하지만 "인코딩(encoding)리소스" 라고만 일반적으로 부른다.
+# 참고로 cl100k_base 토크나이저는 디코딩/인코딩 양방향 모두 가능하지만 일반적으로 "인코딩(encoding)리소스"라고만 부름
 # 
-# cl100k_base는 모델이 아니고 토크나이저(토큰 인코더/디코더)이다
-# cl100k_base 토크나이저는 tiktoken 라이브러리에서 제공된다 (import tiktoken)
-# cl100k_base 토크나이저는 "토큰 수만 알려주는 도구"일 뿐, 문단/문장 경계(구분자)를 자동으로 생성 및 판단하지 않는다
-# cl100k_base 토크나이저는 OpenAI가 권장하는 최신 인코딩 중 하나로, tiktoken 라이브러리에서 제공됩니다. 토큰 수를 정확히 셀 때, 또는 토큰 기준 스플리터를 만들 때 사용합니다.
-# cl100k_base 토크나이저는 텍스트를 토큰(정수 ID)으로 바꾸는 규칙(사전 + BPE 분해 방식)을 제공하고, OpenAI 계열 모델들과 호환되도록 설계된 인코딩입니다.
+# cl100k_base는 모델이 아니고 토크나이저(토큰 인코더/디코더)임
+# cl100k_base 토크나이저는 tiktoken 라이브러리에서 제공됨 (import tiktoken)
+# cl100k_base 토크나이저는 "토큰 수만 알려주는 도구"일 뿐, 문단/문장 경계(구분자)를 자동으로 생성 및 판단하지 않음
+# cl100k_base 토크나이저는 OpenAI가 권장하는 최신 인코딩 중 하나로, tiktoken 라이브러리에서 제공됨. 토큰 수를 정확히 셀 때, 또는 토큰 기준 스플리터를 만들 때 사용함
+# cl100k_base 토크나이저는 텍스트를 토큰(정수 ID)으로 바꾸는 규칙(사전 + BPE 분해 방식)을 제공하고, OpenAI 계열 모델들과 호환되도록 설계된 인코딩임
 # 
-# cl100k_base는 인코딩(텍스트->토큰)과 디코딩(토큰->텍스트) 변환을 양방향으로 처리하는 토크나이저(토큰 인코더/디코더)이다
-# 내부적으로는 바이트기반 BPE (Byte-Level BPE) 스타일의 분해 알고리즘과 토큰사전(vocabulary)을 사용해 문자열을 토큰ID로 인코딩하고, 반대로 토큰ID 시퀀스를 원래(또는 재생성가능한) 문자열로 디코딩한다
-# BPE (Byte Pair Encoding)? 자주 함께 나오는 문자(혹은 바이트) 쌍을 반복적으로 하나의 토큰으로 합쳐서 어휘(vocab)를 만드는 압축·토크나이저 기법
+# cl100k_base는 인코딩(텍스트->토큰)과 디코딩(토큰->텍스트) 변환을 양방향으로 처리하는 토크나이저(토큰 인코더/디코더)임
+# 내부적으로는 바이트기반 BPE (Byte-Level BPE) 스타일의 분해 알고리즘과 토큰사전(vocabulary)을 사용해 문자열을 토큰ID로 인코딩하고, 
+# 반대로 토큰ID 시퀀스를 원래(또는 재생성가능한) 문자열로 디코딩함
+# BPE (Byte Pair Encoding)란? 자주 함께 나오는 문자(혹은 바이트) 쌍을 반복적으로 하나의 토큰으로 합쳐서 어휘(vocab)를 만드는 압축·토크나이저 기법임
 # 
-# 모델과 토크나이저(encoding) 차이점
+# 토크나이저(encoding)와 모델의 차이점
 # 
 # 토크나이저 (예: cl100k_base)
 #   텍스트를 토큰 ID의 시퀀스로 변환하고, 다시 디코딩하는 규칙 (인코딩 표준)
@@ -150,7 +151,7 @@ def _persist_upload(file) -> Path:                      # _persist_upload 함수
                                                         # - file.read(): 파일 내용을 복사해서 bytes 객체를 반환 >> 복사본(메모리) 추가 차지
                                                         # - file.getbuffer(): 원본 데이터(버퍼)를 가리키는 뷰 객체(memoryview)를 반환 >> 복사본(메모리) 없이 참조
     logger.info(f"업로드 파일 저장 경로: {out_path}")          # logger(예: loguru.logger)를 사용해 저장된 파일 경로를 info 레벨로 기록 >> 디버깅용
-    return out_path                                     # 저장된 파일의 pathlib.Path 객체를 호출자에게 반환 >> 호출자는 반환된 경로로 파일을 열어 로더에 전달하거나 파싱하는 등의 후속 처리함.
+    return out_path                                     # 저장된 파일의 pathlib.Path 객체를 호출자에게 반환 >> 호출자는 반환된 경로로 파일을 열어 로더에 전달하거나 파싱하는 등의 후속 처리함
 
 
 def _load_document(path: Path):                         # _load_document라는 함수이며 path 인자는 pathlib.Path 타입을 기대한다는 의미(타입힌트) 
@@ -306,7 +307,7 @@ def answer_without_rag(question: str, openai_api_key: str) -> str:      # answer
                                                                                         # llm = 인스턴스(객체) // invoke = llm 인스턴스가 가진 메서드(method)
                                                                                         # 위 invoke는 LangChain/버전에 따라 메서드명이 다를 수 있고, 반환 객체의 구조도 구현에 따라 다름으로 주의
     return getattr(resp, "content", str(resp))                                          # 반환처리: resp 객체에 content 속성이 있으면 그것을 반환하고(가장일반적), 만약 없으면 str(resp)로 변환한 값을 반환
-                                                                                        # 그 이유는 resp 타입이 {"content": "..."} 형태인지, 아니면 단순 문자열인지 등 변동성을 안전하게 처리하려는 패턴입니다.
+                                                                                        # 그 이유는 resp 타입이 {"content": "..."} 형태인지, 아니면 단순 문자열인지 등 변동성을 안전하게 처리하려는 패턴
 
   
 # =================================
@@ -347,11 +348,11 @@ if "chat_history" not in st.session_state:      # 세션 상태에 "chat_history
 # =========================
 if build_btn:                                       # build_btn(Streamlit 버튼의 반환값)이 True면 (사용자가 빌드버튼을 눌렀으면) 아래를 실행
     if not openai_api_key:                          # openai_api_key가 비어있으면(입력되지 않았으면) 아래 에러 메시지 출력
-        st.error("🔑 OpenAI API Key를 입력하세요.")      # 에러 메시지 출력
-    elif not uploaded_files:                        # API 키는 존재하지만 업로드된 파일(uploaded_files)이 없으면(빈 값이면) 아래를 실행  >>>>>>>>>>>>>> (고민) 없으면 그냥 RAG없이 LLM으로 응답 받도록 수정했음!!!!!!!!!!!!!!!!!!!!!!!!!
+        st.error("🔑 OpenAI API Key를 입력하세요.") # 에러 메시지 출력
+    elif not uploaded_files:                        # API 키는 존재하지만 업로드된 파일(uploaded_files)이 없으면(빈 값이면) 아래를 실행 >>>>> (고민) 없으면 그냥 RAG없이 LLM으로 응답 받도록 수정했음!!!
         st.warning("⚠️ 최소 1개 이상의 문서를 업로드하세요.")     # 경고 메시지 출력
-    else:                                           # 위 두 조건(키없음/파일없음)을 모두 지나면 실제 벡터인덱스 생성작업을 수행하는 본 작업 수행
-        with st.spinner("🏃🏻 Vector Index 생성 중… (최초에는 모델/토크나이저 로딩 시간이 걸릴 수 있습니다)"):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
+    else:                                                       # 위 두 조건(키없음/파일없음)을 모두 지나면 실제 벡터인덱스 생성작업을 수행하는 본 작업 수행
+        with st.spinner("🏃🏻 Vector Index 생성 중… (최초에는 로딩 시간이 걸릴 수 있습니다.)"):   # Streamlit의 스피너(회전 표시) 컨텍스트 매니저를 실행
             try:                                                                # 오류가 날 수 있는 작업을 시도하기 위해 try 블록을 시작 >> 실패하면 except로 처리
                 doc_paths = [_persist_upload(f) for f in uploaded_files]        # 리스트 컴프리헨션: 업로드된 각 파일 f에 대해 _persist_upload(f)를 호출(업로드객체를 임시파일로 저장)하고, 그 반환값(저장된Path)들을 doc_paths 리스트으로 생성/반환
                                                                                 # 즉, 메모리 업로드 객체 >> 실제 임시파일 경로들로 변환하는 단계
@@ -407,10 +408,10 @@ if delete_btn:
 # =========================
 # 질의 UI
 # =========================
-st.divider()                            # Streamlit UI 페이지에 가로 구분선(visual divider) 표시
+st.divider()                                  # Streamlit UI 페이지에 가로 구분선(visual divider) 표시
 st.subheader("💬 문서 기반 자연어 질의")       # Streamlit UI 페이지에 소제목(subheader)을 표시
 user_q = st.text_input("질문 입력:", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")  # Streamlit UI 페이지에 텍스트 입력 상자 표시
-ask = st.button("질문하기")                # Streamlit UI 페이지에 버튼을 화면에 생성하고, 클릭 여부를 불리언으로 반환 >> 라벨 "질문하기" 글자가 버튼에 표시
+ask = st.button("질문하기")                   # Streamlit UI 페이지에 버튼을 화면에 생성하고, 클릭 여부를 불리언으로 반환 >> 라벨 "질문하기" 글자가 버튼에 표시
 
 
 # ==============================================
