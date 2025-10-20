@@ -17,7 +17,8 @@ import streamlit as st             # Streamlit — 대화형 웹 앱 UI 생성 �
 from loguru import logger          # Loguru — 깔끔하고 강력한 로깅 기능 제공
 
 # LangChain 핵심/유틸
-from langchain.chains import ConversationalRetrievalChain
+# from langchain.chains import ConversationalRetrievalChain # 2025.10.20 # LangChain 0.3.x 버전 구조 개편 >> langchain.chains 모듈엔 ConversationalRetrievalChain이 없음
+from langchain_community.chains import ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import SystemMessage, HumanMessage # LangChain 대화 메시지 타입 
 
