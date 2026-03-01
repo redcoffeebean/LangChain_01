@@ -3,17 +3,25 @@ chromadb
 pinecone
 
 # 기본
-streamlit==1.32
-langchain>=0.2.0
-langchain-community>=0.2.0
-langchain-core>=0.2.0
-langchain-openai>=0.2.0
-langchain-text-splitters>=0.2.0
-langchain-huggingface>=0.1.0
+# 2025.09
+# streamlit==1.32
+# langchain>=0.2.0
+# langchain-community>=0.2.0
+# langchain-core>=0.2.0
+# langchain-openai>=0.2.0
+# langchain-text-splitters>=0.2.0
+# langchain-huggingface>=0.1.0
+# 2026.03
+streamlit==1.54.0
+langchain==0.3.27
+langchain-community==0.3.21
+langchain-core==0.3.83
+langchain-openai==0.3.35
+langchain-text-splitters==0.3.11
+langchain-huggingface==0.3.1
+
 tiktoken
 loguru
-
-
 # RAG 구성 요소
 faiss-cpu
 sentence-transformers
