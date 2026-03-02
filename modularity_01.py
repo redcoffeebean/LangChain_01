@@ -1,13 +1,3 @@
-# ==================================================
-# Modular RAG Template — FINAL (single file, corrected)
-# ==================================================
-# - Fix: file_uploader positional/keyword order (label first, key="uploader" last)
-# - Fix: All RAG UI code is correctly indented **inside** main()
-# - Keep: FAISS Dashboard captions intact (minimal/neutral)
-# - Add: Active Vector Index banner so the built index remains visible after view toggles
-# - Minimal, safe defaults with graceful fallbacks
-# ==================================================
-
 from __future__ import annotations
 import os
 import time
@@ -15,7 +5,6 @@ import importlib.util
 from dataclasses import dataclass
 from typing import Any, Dict, List
 from pathlib import Path
-
 import streamlit as st
 
 # ------------------------------
@@ -478,6 +467,7 @@ def main():
     )
 #Similarity 검색: query와 가장 비슷한 문서/청크를 순서대로 뽑음 → 중복이 많아질 수 있음
 #MMR 검색: query와 비슷하면서도 이미 뽑힌 것들과 덜 겹치는 것을 뽑음 → coverage(범위)가 좋아짐
+#MMR = Maximal Marginal Relevance = 최대 한계 관련성
 #ANN(Approximate Nearest Neighbor) 인덱스 (HNSW/IVF등)
 #토큰은 문자/단어가 아니라 기존 학습된 조각 사전(vocabulary)에 맞춰 쪼갠 결과
 
@@ -505,7 +495,6 @@ def main():
         key="uploader",
     )
 
-    #build_col, chat_col = st.columns([1, 2])
     build_col, chat_col = st.columns([1, 1], gap="large")  # 1대1화면분할 #"small"|"medium"|"large"
 
     with build_col:
@@ -555,7 +544,6 @@ def main():
 
     with chat_col:
         st.subheader("2) Query")
-        #q = st.text_input("질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")
         q = st.text_input(label="질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.", label_visibility="collapsed")
         if st.button("질문하기", use_container_width=True):
             chain = st.session_state.get("_chain")
