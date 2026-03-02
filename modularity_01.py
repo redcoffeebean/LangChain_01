@@ -471,9 +471,9 @@ def main():
     # 파이프라인 설명
     st.markdown(
         """
-📢**RAG-Corpus:** Loader → Splitter(Seperator|tokenizer) → (Chunks → Embedding) → (Vector Store → Vector Index)
+📢 **RAG-Corpus:** Loader → Splitter(Seperator|tokenizer) → (Chunks → Embedding) → (Vector Store → Vector Index)
 
-🤖**Query-Serving:** Instruction → User Query → Query Embedding → Retriever (Similarity|MMR|MetaFiltering) → Top-k Chunks → LLM (호출|추론|응답생성) → Answer
+👽 **Query-Serving:** Instruction → User Query → Query Embedding → Retriever (Similarity|MMR|MetaFiltering) → Top-k Chunks → LLM (호출|추론|응답생성) → Answer
         """
     )
 #Similarity 검색: query와 가장 비슷한 문서/청크를 순서대로 뽑음 → 중복이 많아질 수 있음
