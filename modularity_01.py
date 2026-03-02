@@ -471,15 +471,15 @@ def main():
     # 파이프라인 설명
     st.markdown(
         """
-**RAG-Corpus:**
+📢**RAG-Corpus:** Loader → Splitter(Seperator|tokenizer) → (Chunks → Embedding) → (Vector Store → Vector Index)
 
-Loader → Splitter(Seperator|tokenizer) → (Chunk → Embedding) → (Vector Store → Vector Index)
-
-**Query-Serving:**
-
-Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFiltering) → Prompt → LLM (호출|추론|응답생성) → Answer
+🤖**Query-Serving:** Instruction → User Query → Query Embedding → Retriever (Similarity|MMR|MetaFiltering) → Top-k Chunks → LLM (호출|추론|응답생성) → Answer
         """
     )
+#Similarity 검색: query와 가장 비슷한 문서/청크를 순서대로 뽑음 → 중복이 많아질 수 있음
+#MMR 검색: query와 비슷하면서도 이미 뽑힌 것들과 덜 겹치는 것을 뽑음 → coverage(범위)가 좋아짐
+#ANN(Approximate Nearest Neighbor) 인덱스 (HNSW/IVF등)
+#토큰은 문자/단어가 아니라 기존 학습된 조각 사전(vocabulary)에 맞춰 쪼갠 결과
 
     # --- Active Vector Index banner (inside main) ---
     active_vs = st.session_state.get("_vs_provider")
@@ -505,7 +505,8 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
         key="uploader",
     )
 
-    build_col, chat_col = st.columns([1, 2])
+    #build_col, chat_col = st.columns([1, 2])
+    build_col, chat_col = st.columns([1, 1], gap="large")  # 1대1화면분할 #"small"|"medium"|"large"
 
     with build_col:
         st.subheader("1) Vector Index")
@@ -554,7 +555,7 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
 
     with chat_col:
         st.subheader("2) Query")
-        # q = st.text_input("질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")
+        #q = st.text_input("질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")
         q = st.text_input(label="질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.", label_visibility="collapsed")
         if st.button("질문하기", use_container_width=True):
             chain = st.session_state.get("_chain")
