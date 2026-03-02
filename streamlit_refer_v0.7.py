@@ -51,7 +51,7 @@ TOKEN_CHUNK_OVERLAP = 80
 # =========================
 st.set_page_config(page_title="RAG Chatbot", page_icon="🤖")
 st.title("CSS RAG Chatbot v0.7 ✨")  
-st.caption("문서가 업로드된 경우는 RAG로 답변하고, 업로드되지 않은 경우는 LLM에서 답변을 제공합니다.")
+st.caption("문서가 업로드된 경우는 RAG 기반으로 답변하고, 업로드되지 않은 경우는 LLM 기반으로 답변을 제공합니다.")
 
 # =========================
 # 유틸리티(헬퍼 함수) 모음
