@@ -555,7 +555,7 @@ Query → Query Embedding → Retriever (Vector Search:Similarity|MMR|MetaFilter
     with chat_col:
         st.subheader("2) Query")
         # q = st.text_input("질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")
-        q = st.text_input(placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.")
+        q = st.text_input(label="질문입력", placeholder="예: 업로드한 문서 내용에서 질문을 해 보세요.", label_visibility="collapsed")
         if st.button("질문하기", use_container_width=True):
             chain = st.session_state.get("_chain")
             if not chain:
