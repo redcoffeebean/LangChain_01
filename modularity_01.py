@@ -264,7 +264,7 @@ def build_chain(vs_provider: VectorStoreProvider, llm_provider: LLMProvider):
 # 사이드바
 # ------------------------------
 def _sidebar_config():
-    st.sidebar.header("Configuration") #선
+    st.sidebar.header("⚙ Configuration") #선택 
 
     emb_label = st.sidebar.selectbox(
         "Embeddings", options=[x[0] for x in UI_CHOICES["Embedding Model"]], index=0,
@@ -438,8 +438,8 @@ def render_faiss_dashboard(cfg):
 # 메인 (RAG)
 # ------------------------------
 def main():
-    st.set_page_config(page_title="RAG Configuration Playground", page_icon="⚙", layout="wide")
-    st.title("⚙ RAG Configuration Playground")
+    st.set_page_config(page_title="RAG Config Playground", page_icon="⚙", layout="wide")
+    st.title("⚙ RAG Config Playground")
 
     cfg = _sidebar_config()
 
