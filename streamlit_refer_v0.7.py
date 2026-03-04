@@ -176,7 +176,7 @@ def answer_without_rag(question: str, openai_api_key: str) -> str:
         max_retries=3,
         timeout=10,
     )
-    sys = SystemMessage(content="너는 간결한 조수다. 모든 답변은 2~3문장 이내로 핵심만 요약해서 말해라.")    # 프롬프트 중 시스템 롤에 해당(role="system")
+    sys = SystemMessage(content="너는 간결한 조수다. 모든 답변은 2~3문장 이내로 핵심만 요약해서 말해라. 그리고 현재로써 모르고 알 수 없다면 모른다고 알 수 없다고 사실대로 말해라.")    # 프롬프트 중 시스템 롤에 해당(role="system")
     user = HumanMessage(content=question)       
     resp = llm.invoke([sys, user])     
     return getattr(resp, "content", str(resp)) 
